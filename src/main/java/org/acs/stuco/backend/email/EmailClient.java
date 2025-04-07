@@ -15,7 +15,7 @@ import java.util.List;
 public class EmailClient
 {
     private static final Logger logger = LoggerFactory.getLogger(EmailClient.class);
-    private static final String EMAIL_SERVICE_URL = "http://email-service:8081/emails/send";
+    private static final String EMAIL_SERVICE_URL = "http://localhost:8081/emails/send";
 
     @Autowired
     private RestTemplate restTemplate;
