@@ -9,6 +9,12 @@ plugins {
 group = 'org.acs.stuco'
 version = '1.0.0'
 
+bootJar {
+    archiveFileName = "app.jar"  // Forces consistent output filename
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
