@@ -111,7 +111,7 @@ public class AuthService
     {
         try
         {
-            String verificationLink = "http://localhost:5173/verify?token=" + token;
+            String verificationLink = "http://stucoacs.com/verify?token=" + token;
             emailClient.sendEmail(
                     List.of(email),
                     List.of(),
