@@ -54,6 +54,8 @@ public class OrderService
                 if (product.getAvailable() > 0)
                 {
                     productService.reduceStock(product.getId(), order.getQuantity());
+                    if (product.getAvailable() == 0)
+                        productService.deleteOutOfStockProducts();
                 }
                 // Copy product details into the order record
                 order.setProductName(product.getName());
