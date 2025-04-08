@@ -24,7 +24,7 @@ public class NewsPost
 
     // Storing markdown content in a text column
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Column
