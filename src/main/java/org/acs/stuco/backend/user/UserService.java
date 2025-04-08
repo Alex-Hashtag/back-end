@@ -4,6 +4,7 @@ import org.acs.stuco.backend.exceptions.UserNotFoundException;
 import org.acs.stuco.backend.upload.UploadService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 
 /**
@@ -100,11 +102,44 @@ public class UserService
      * @param newRole New role to assign
      * @return Updated user entity
      */
-    public User updateUserRole(Long userId, Role newRole)
-    {
-        User user = getUserById(userId);
-        user.setRole(newRole);
-        return userRepository.save(user);
+    public User updateUserRole(Long userId, Role newRole) {
+        User currentUser = getCurrentUser();  // the STUCO or ADMIN performing the update
+        User targetUser  = getUserById(userId);
+
+        int currentUserRank = getRoleRank(currentUser.getRole());
+        int targetUserRank  = getRoleRank(targetUser.getRole());
+        int newRoleRank     = getRoleRank(newRole);
+
+        // If current user is STUCO (rank 3) ...
+        if (currentUser.getRole() == Role.STUCO) {
+            // STUCO can only update users whose role is strictly below STUCO (rank < 3)
+            // and can only assign roles strictly below STUCO (rank < 3).
+            if (targetUserRank >= 3) {
+                throw new AccessDeniedException("STUCO cannot update users with STUCO or ADMIN role.");
+            }
+            if (newRoleRank >= 3) {
+                throw new AccessDeniedException("STUCO can only assign USER or CLASS_REP.");
+            }
+        }
+        // If current user is ADMIN (rank 4) ...
+        else if (currentUser.getRole() == Role.ADMIN) {
+            // ADMIN can update any user rank <= 4 (which is everyone)
+            // but if you want to block future roles above ADMIN, we can check that too.
+            if (targetUserRank > 4) {
+                throw new AccessDeniedException("ADMIN cannot update roles above ADMIN.");
+            }
+            if (newRoleRank > 4) {
+                throw new AccessDeniedException("Cannot assign a role above ADMIN.");
+            }
+        }
+        // Otherwise, user is neither STUCO nor ADMIN => not authorized
+        else {
+            throw new AccessDeniedException("Only STUCO or ADMIN can change roles.");
+        }
+
+        // If all checks pass, update the role
+        targetUser.setRole(newRole);
+        return userRepository.save(targetUser);
     }
 
     /**
@@ -191,4 +226,53 @@ public class UserService
         }
         userRepository.delete(user);
     }
+
+    public Page<User> filterUsers(List<Role> roles, String searchTerm, Integer graduationYear,
+                                  BigDecimal balanceEq, BigDecimal balanceGt, BigDecimal balanceLt,
+                                  Pageable pageable) {
+        Specification<User> spec = Specification.where(null);
+
+        // Role filter
+        if (roles != null && !roles.isEmpty()) {
+            spec = spec.and(UserSpecifications.hasRoleIn(roles));
+        }
+
+        // Vague search filter (name or email)
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            spec = spec.and(UserSpecifications.matchesSearchTerm(searchTerm.trim()));
+        }
+
+        // Graduation year filter (parsing digits from email)
+        if (graduationYear != null) {
+            spec = spec.and(UserSpecifications.hasGraduationYear(graduationYear));
+        }
+
+        // Balance filter for exact match
+        if (balanceEq != null) {
+            spec = spec.and(UserSpecifications.hasBalanceEqual(balanceEq));
+        }
+
+        // Balance filter for greater-than
+        if (balanceGt != null) {
+            spec = spec.and(UserSpecifications.hasBalanceGreaterThan(balanceGt));
+        }
+
+        // Balance filter for less-than
+        if (balanceLt != null) {
+            spec = spec.and(UserSpecifications.hasBalanceLessThan(balanceLt));
+        }
+
+        // Execute the dynamic query with pagination and sorting
+        return userRepository.findAll(spec, pageable);
+    }
+
+    private int getRoleRank(Role role) {
+        return switch (role) {
+            case USER -> 1;
+            case CLASS_REP -> 2;
+            case STUCO -> 3;
+            case ADMIN -> 4;
+        };
+    }
+
 }

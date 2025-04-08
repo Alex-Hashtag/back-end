@@ -7,6 +7,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 
 /**
  * REST controller handling user management operations.
@@ -28,7 +31,7 @@ public class UserController
     /// @param pageable Pagination parameters (page, size, sort)
     /// @return 200 OK with page of users
     @GetMapping
-    @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Page<User>> getAllUsers(Pageable pageable)
     {
         return ResponseEntity.ok(userService.getAllUsers(pageable));
@@ -40,7 +43,7 @@ public class UserController
     /// @param id User ID to retrieve
     /// @return 200 OK with user entity
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<User> getUserById(@PathVariable Long id)
     {
         return ResponseEntity.ok(userService.getUserById(id));
@@ -74,13 +77,14 @@ public class UserController
     /// @param newRole New role (from request parameter)
     /// @return 200 OK with updated user entity
     @PatchMapping("/{id}/role")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('STUCO','ADMIN')")
     public ResponseEntity<User> updateUserRole(
             @PathVariable Long id,
             @RequestParam Role newRole)
     {
         return ResponseEntity.ok(userService.updateUserRole(id, newRole));
     }
+
 
     /// GET /api/users/roles
     /// Retrieves list of available user roles (STUCO/Admin only).
@@ -136,10 +140,27 @@ public class UserController
     /// @param id ID of user to delete
     /// @return 204 No Content
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable Long id)
     {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
+    public ResponseEntity<Page<User>> filterUsers(
+            @RequestParam(required = false) List<Role> roles,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) Integer graduationYear,
+            @RequestParam(required = false) BigDecimal balanceEq,
+            @RequestParam(required = false) BigDecimal balanceGt,
+            @RequestParam(required = false) BigDecimal balanceLt,
+            Pageable pageable
+    ) {
+        Page<User> result = userService.filterUsers(roles, searchTerm, graduationYear,
+                balanceEq, balanceGt, balanceLt,
+                pageable);
+        return ResponseEntity.ok(result);
     }
 }
