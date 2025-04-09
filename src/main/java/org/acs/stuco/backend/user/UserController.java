@@ -31,7 +31,7 @@ public class UserController
     /// @param pageable Pagination parameters (page, size, sort)
     /// @return 200 OK with page of users
     @GetMapping
-    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('REP') or hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Page<User>> getAllUsers(Pageable pageable)
     {
         return ResponseEntity.ok(userService.getAllUsers(pageable));
@@ -43,7 +43,7 @@ public class UserController
     /// @param id User ID to retrieve
     /// @return 200 OK with user entity
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('REP') or hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<User> getUserById(@PathVariable Long id)
     {
         return ResponseEntity.ok(userService.getUserById(id));
@@ -148,7 +148,7 @@ public class UserController
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasRole('CLASS_REP') or hasRole('STUCO') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('REP') or hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Page<User>> filterUsers(
             @RequestParam(required = false) List<Role> roles,
             @RequestParam(required = false) String searchTerm,
@@ -156,11 +156,11 @@ public class UserController
             @RequestParam(required = false) BigDecimal balanceEq,
             @RequestParam(required = false) BigDecimal balanceGt,
             @RequestParam(required = false) BigDecimal balanceLt,
+            @RequestParam(required = false) Boolean activeOrders,
             Pageable pageable
     ) {
         Page<User> result = userService.filterUsers(roles, searchTerm, graduationYear,
-                balanceEq, balanceGt, balanceLt,
-                pageable);
+                balanceEq, balanceGt, balanceLt, activeOrders, pageable);
         return ResponseEntity.ok(result);
     }
 }

@@ -106,7 +106,6 @@ public class UserService
         User currentUser = getCurrentUser();  // the STUCO or ADMIN performing the update
         User targetUser  = getUserById(userId);
 
-        int currentUserRank = getRoleRank(currentUser.getRole());
         int targetUserRank  = getRoleRank(targetUser.getRole());
         int newRoleRank     = getRoleRank(newRole);
 
@@ -114,10 +113,10 @@ public class UserService
         if (currentUser.getRole() == Role.STUCO) {
             // STUCO can only update users whose role is strictly below STUCO (rank < 3)
             // and can only assign roles strictly below STUCO (rank < 3).
-            if (targetUserRank >= 3) {
+            if (targetUserRank >= 2) {
                 throw new AccessDeniedException("STUCO cannot update users with STUCO or ADMIN role.");
             }
-            if (newRoleRank >= 3) {
+            if (newRoleRank >= 2) {
                 throw new AccessDeniedException("STUCO can only assign USER or CLASS_REP.");
             }
         }
@@ -125,10 +124,10 @@ public class UserService
         else if (currentUser.getRole() == Role.ADMIN) {
             // ADMIN can update any user rank <= 4 (which is everyone)
             // but if you want to block future roles above ADMIN, we can check that too.
-            if (targetUserRank > 4) {
+            if (targetUserRank > 3) {
                 throw new AccessDeniedException("ADMIN cannot update roles above ADMIN.");
             }
-            if (newRoleRank > 4) {
+            if (newRoleRank > 3) {
                 throw new AccessDeniedException("Cannot assign a role above ADMIN.");
             }
         }
@@ -227,8 +226,13 @@ public class UserService
         userRepository.delete(user);
     }
 
-    public Page<User> filterUsers(List<Role> roles, String searchTerm, Integer graduationYear,
-                                  BigDecimal balanceEq, BigDecimal balanceGt, BigDecimal balanceLt,
+    public Page<User> filterUsers(List<Role> roles,
+                                  String searchTerm,
+                                  Integer graduationYear,
+                                  BigDecimal balanceEq,
+                                  BigDecimal balanceGt,
+                                  BigDecimal balanceLt,
+                                  Boolean activeOrders, // New parameter
                                   Pageable pageable) {
         Specification<User> spec = Specification.where(null);
 
@@ -242,36 +246,41 @@ public class UserService
             spec = spec.and(UserSpecifications.matchesSearchTerm(searchTerm.trim()));
         }
 
-        // Graduation year filter (parsing digits from email)
+        // Graduation year filter (from email digits)
         if (graduationYear != null) {
             spec = spec.and(UserSpecifications.hasGraduationYear(graduationYear));
         }
 
-        // Balance filter for exact match
+        // Balance exact match filter
         if (balanceEq != null) {
             spec = spec.and(UserSpecifications.hasBalanceEqual(balanceEq));
         }
 
-        // Balance filter for greater-than
+        // Balance greater-than filter
         if (balanceGt != null) {
             spec = spec.and(UserSpecifications.hasBalanceGreaterThan(balanceGt));
         }
 
-        // Balance filter for less-than
+        // Balance less-than filter
         if (balanceLt != null) {
             spec = spec.and(UserSpecifications.hasBalanceLessThan(balanceLt));
         }
 
-        // Execute the dynamic query with pagination and sorting
+        // --- NEW: Active orders filter ---
+        if (activeOrders != null && activeOrders) {
+            spec = spec.and(UserSpecifications.withActiveOrders());
+        }
+
+        // Execute the dynamic query with pagination and sorting.
         return userRepository.findAll(spec, pageable);
     }
 
     private int getRoleRank(Role role) {
         return switch (role) {
-            case USER -> 1;
-            case CLASS_REP -> 2;
-            case STUCO -> 3;
-            case ADMIN -> 4;
+            case USER -> 0;
+            case CLASS_REP -> 1;
+            case STUCO -> 2;
+            case ADMIN -> 3;
         };
     }
 
