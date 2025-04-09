@@ -8,6 +8,7 @@ import org.acs.stuco.backend.user.User;
 import org.acs.stuco.backend.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,8 @@ public class AuthService
     private final EmailClient emailClient;
     private final UploadService uploadService;
     private final ApplicationEventPublisher eventPublisher;
+    @Value("${acs.service.frontend.url}")
+    private String domain;
 
     public AuthService(
             UserRepository userRepository,
@@ -111,7 +114,7 @@ public class AuthService
     {
         try
         {
-            String verificationLink = "http://stucoacs.com/verify?token=" + token;
+            String verificationLink = domain + "verify?token=" + token;
             emailClient.sendEmail(
                     List.of(email),
                     List.of(),
