@@ -50,8 +50,7 @@ public class NewsController
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createNewsPost(
             @AuthenticationPrincipal User user,
-            @RequestParam("title") String title,
-            @RequestParam("content") String content,
+            @RequestPart("post") NewsPostRequest request,
             @RequestPart(value = "banner", required = false) MultipartFile banner,
             @RequestPart(value = "extraPhotos", required = false) MultipartFile[] extraPhotos
     )
@@ -61,7 +60,7 @@ public class NewsController
         {
             return ResponseEntity.status(403).body("Forbidden");
         }
-        return newsService.createNewsPost(title, content, banner, extraPhotos);
+        return newsService.createNewsPost(request, banner, extraPhotos);
     }
 
     // PUT /api/news/{id} - Update a news post (role >= 2) using multipart/form-data
@@ -69,8 +68,7 @@ public class NewsController
     public ResponseEntity<?> updateNewsPost(
             @AuthenticationPrincipal User user,
             @PathVariable Long id,
-            @RequestParam("title") String title,
-            @RequestParam("content") String content,
+            @RequestPart("post") NewsPostRequest request,
             @RequestPart(value = "banner", required = false) MultipartFile banner,
             @RequestPart(value = "extraPhotos", required = false) MultipartFile[] extraPhotos
     )
@@ -80,7 +78,7 @@ public class NewsController
         {
             return ResponseEntity.status(403).body("Forbidden");
         }
-        return newsService.updateNewsPost(id, title, content, banner, extraPhotos);
+        return newsService.updateNewsPost(id, request, banner, extraPhotos);
     }
 
     // DELETE /api/news/{id} - Delete a news post
