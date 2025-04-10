@@ -1,6 +1,8 @@
 package org.acs.stuco.backend.auth;
 
+import jakarta.validation.Valid;
 import org.acs.stuco.backend.auth.dto.LoginRequest;
+import org.acs.stuco.backend.auth.dto.RegisterRequest;
 import org.acs.stuco.backend.auth.dto.UserResponse;
 import org.acs.stuco.backend.user.User;
 import org.springframework.http.ResponseEntity;
@@ -22,18 +24,11 @@ public class AuthController
 
     @PostMapping("/register")
     public ResponseEntity<?> register(
-            @RequestParam("email") String email,
-            @RequestParam("firstName") String firstName,
-            @RequestParam("lastName") String lastName,
-            @RequestParam("password") String password,
+            @Valid @RequestPart("user") RegisterRequest request,
             @RequestPart(value = "avatar", required = false) MultipartFile avatar
-    )
-    {
-        // Combine the two name fields into a single string
-        String fullName = firstName + " " + lastName;
-
-        // Delegate to AuthService
-        return authService.register(email, fullName, password, avatar);
+    ) {
+        String fullName = request.firstName() + " " + request.lastName();
+        return authService.register(request.email(), fullName, request.password(), avatar);
     }
 
     @PostMapping("/login")
