@@ -1,8 +1,9 @@
 package org.acs.stuco.backend.news;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 
 public record NewsPostRequest(
         @NotBlank(message = "Title is required")
@@ -17,5 +18,7 @@ public record NewsPostRequest(
 
         @Pattern(regexp = "^(https?://[^,]*,?)*$", message = "Extra photos must be valid URLs separated by commas")
         String extraPhotos
-) {
+)
+{
 }
+

@@ -52,14 +52,13 @@ public class JwtAuthFilter extends OncePerRequestFilter
         final String jwt = authHeader.substring(7);
         final String userEmail = jwtService.extractEmail(jwt);
 
-        // If we already have an authentication, skip
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null)
         {
             User user = userRepository.findByEmail(userEmail).orElse(null);
 
             if (user != null && jwtService.isTokenValid(jwt, user))
             {
-                // Map the enum role to a Spring Security authority
+
                 List<GrantedAuthority> authorities = mapRoleToAuthorities(user.getRole());
 
                 UsernamePasswordAuthenticationToken authToken =
@@ -76,12 +75,11 @@ public class JwtAuthFilter extends OncePerRequestFilter
         filterChain.doFilter(request, response);
     }
 
-    // Helper method that converts your enum Role -> GrantedAuthority
     private List<GrantedAuthority> mapRoleToAuthorities(Role role)
     {
         List<GrantedAuthority> authorities = new ArrayList<>();
-        // Because your SecurityConfig uses hasAnyRole("STUCO", "ADMIN", "REP"),
-        // we need ROLE_ prefixes.
+
+
         switch (role)
         {
             case ADMIN -> authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
@@ -92,4 +90,5 @@ public class JwtAuthFilter extends OncePerRequestFilter
         return authorities;
     }
 }
+
 

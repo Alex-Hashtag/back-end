@@ -25,16 +25,14 @@ public class NewsController
         this.newsService = newsService;
     }
 
-    // GET /api/news - Paginated list of news posts sorted by createdAt (newest first)
     @GetMapping
     public ResponseEntity<Page<NewsPost>> getAllNews(Pageable pageable)
     {
-        // Enforce sorting by createdAt descending regardless of client parameters
+
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("createdAt").descending());
         return ResponseEntity.ok(newsService.findAll(sorted));
     }
 
-    // GET /api/news/{id} - Get news post by id
     @GetMapping("/{id}")
     public ResponseEntity<NewsPost> getNewsById(@PathVariable Long id)
     {
@@ -46,7 +44,6 @@ public class NewsController
         return ResponseEntity.ok(post);
     }
 
-    // POST /api/news - Create a news post (role >= 2) using multipart/form-data
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createNewsPost(
             @AuthenticationPrincipal User user,
@@ -63,7 +60,6 @@ public class NewsController
         return newsService.createNewsPost(request, banner, extraPhotos);
     }
 
-    // PUT /api/news/{id} - Update a news post (role >= 2) using multipart/form-data
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> updateNewsPost(
             @AuthenticationPrincipal User user,
@@ -81,7 +77,6 @@ public class NewsController
         return newsService.updateNewsPost(id, request, banner, extraPhotos);
     }
 
-    // DELETE /api/news/{id} - Delete a news post
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteNewsPost(
             @AuthenticationPrincipal User user,
@@ -100,4 +95,5 @@ public class NewsController
         return ResponseEntity.ok("News post deleted");
     }
 }
+
 

@@ -38,7 +38,7 @@ public class SecurityConfig
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
+
                         .requestMatchers(
                                 HttpMethod.POST, "/api/auth/login",
                                 "/api/auth/register",
@@ -58,23 +58,19 @@ public class SecurityConfig
                                 "/v3/api-docs/**"
                         ).permitAll()
 
-                        // User management
                         .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
                         .requestMatchers(HttpMethod.PUT, "/api/users/me").authenticated()
                         .requestMatchers("/api/users/**").hasAnyRole("STUCO", "ADMIN")
 
-                        // Products management - secure all write operations
                         .requestMatchers(HttpMethod.POST, "/api/products").hasAnyRole("STUCO", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/products/**").hasAnyRole("STUCO", "ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/products/**").hasAnyRole("STUCO", "ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/products/**").hasAnyRole("STUCO", "ADMIN")
 
-                        // Orders
                         .requestMatchers(HttpMethod.POST, "/api/orders").authenticated()
                         .requestMatchers("/api/orders/admin/**").hasAnyRole("STUCO", "ADMIN")
                         .requestMatchers("/api/orders/assigned").hasRole("REP")
 
-                        // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)

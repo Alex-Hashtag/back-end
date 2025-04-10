@@ -28,17 +28,12 @@ public class Product
     @Column(nullable = false)
     private BigDecimal price;
 
-    /**
-     * Available quantity:
-     * > 0: limited stock
-     * 0: sold out (should be auto-deleted)
-     * -1: unlimited stock
-     */
+
     @Column(nullable = false)
     private Integer available;
 
     private String imageUrl;
 
-    // ID of the user who created the product
     private Long createdBy;
 }
+

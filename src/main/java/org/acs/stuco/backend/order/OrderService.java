@@ -40,50 +40,49 @@ public class OrderService
 
         if (providedProduct != null && providedProduct.getId() != null)
         {
-            // Try to fetch the product from the database as an Optional
+
             Optional<Product> productOpt = productService.getProductById(providedProduct.getId());
             if (productOpt.isPresent())
             {
                 Product product = productOpt.get();
-                // Check product availability
+
                 if (product.getAvailable() != -1 && product.getAvailable() < order.getQuantity())
                 {
                     throw new InsufficientStockException();
                 }
-                // Reserve stock if not unlimited
+
                 if (product.getAvailable() > 0)
                 {
                     productService.reduceStock(product.getId(), order.getQuantity());
                     if (product.getAvailable() == 0)
                         productService.deleteOutOfStockProducts();
                 }
-                // Copy product details into the order record
+
                 order.setProductName(product.getName());
                 order.setProductPrice(product.getPrice());
-                // Associate the product with the order (optional, as later the product might be removed)
+
                 order.setProduct(product);
             }
             else
             {
-                // Product not found in the database, so we must have custom product details
+
                 if (order.getProductName() == null || order.getProductPrice() == null)
                 {
                     throw new IllegalArgumentException("Product not found and no product details provided");
                 }
-                // Since the product doesn't exist in the DB, null out the product reference
+
                 order.setProduct(null);
             }
         }
         else
         {
-            // No product reference was provided; ensure custom product details exist
+
             if (order.getProductName() == null || order.getProductPrice() == null)
             {
                 throw new IllegalArgumentException("Either a product reference or custom product details must be provided");
             }
         }
 
-        // The 'instructions' field is optional and will be saved if provided in the order payload.
         return orderRepository.save(order);
     }
 
@@ -121,7 +120,6 @@ public class OrderService
         return orderRepository.getOrderStatistics();
     }
 
-    // Archives delivered orders that are over 30 days old.
     @Transactional
     public void archiveDeliveredOrders()
     {
@@ -135,7 +133,7 @@ public class OrderService
         }
     }
 
-    private ArchivedOrder convertToArchivedOrder(Order order)
+    public ArchivedOrder convertToArchivedOrder(Order order)
     {
         ArchivedOrder archivedOrder = new ArchivedOrder();
         archivedOrder.setId(order.getId());
@@ -148,7 +146,6 @@ public class OrderService
         archivedOrder.setPaidAt(order.getPaidAt());
         archivedOrder.setAssignedRep(order.getAssignedRep());
 
-        // NEW FIELDS
         archivedOrder.setInstructions(order.getInstructions());
         archivedOrder.setProductName(order.getProductName());
         archivedOrder.setProductPrice(order.getProductPrice());
@@ -156,11 +153,10 @@ public class OrderService
         return archivedOrder;
     }
 
-
-    // Retrieves archived orders with pagination.
     public Page<ArchivedOrder> getArchivedOrders(Pageable pageable)
     {
         return archivedOrderRepository.findAll(pageable);
     }
 }
+
 

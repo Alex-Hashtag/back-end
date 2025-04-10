@@ -6,6 +6,7 @@ import org.acs.stuco.backend.user.User;
 import org.acs.stuco.backend.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -21,11 +22,16 @@ public class NewsPostCreatedEventListener
 
     private final EmailClient emailClient;
     private final UserRepository userRepository;
+    private final String frontendUrl;
 
-    public NewsPostCreatedEventListener(EmailClient emailClient, UserRepository userRepository)
+    public NewsPostCreatedEventListener(
+            EmailClient emailClient,
+            UserRepository userRepository,
+            @Value("${acs.service.frontend.url}") String frontendUrl)
     {
         this.emailClient = emailClient;
         this.userRepository = userRepository;
+        this.frontendUrl = frontendUrl;
     }
 
     @Async
@@ -34,7 +40,6 @@ public class NewsPostCreatedEventListener
     {
         NewsPost newsPost = event.newsPost();
 
-        // Get all verified users using the new repository method
         List<User> verifiedUsers = userRepository.findByEmailVerified(true);
         if (verifiedUsers.isEmpty())
         {
@@ -42,12 +47,16 @@ public class NewsPostCreatedEventListener
             return CompletableFuture.completedFuture(null);
         }
 
-        // Prepare email content
         String contentPreview = newsPost.getContent().length() > 100
                 ? newsPost.getContent().substring(0, 100) + "..."
                 : newsPost.getContent();
 
-        String readMoreLink = "http://localhost:5173/news/" + newsPost.getId();
+        String readMoreLink = frontendUrl + "news/" + newsPost.getId();
+
+        if (readMoreLink.contains("//news"))
+        {
+            readMoreLink = readMoreLink.replace("//news", "/news");
+        }
 
         String htmlContent = String.format(
                 "<html>" +
@@ -66,7 +75,6 @@ public class NewsPostCreatedEventListener
                         : ""
         );
 
-        // Send emails to all verified users
         try
         {
             List<String> emails = verifiedUsers.stream()
@@ -93,3 +101,4 @@ public class NewsPostCreatedEventListener
         }
     }
 }
+

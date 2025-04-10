@@ -1,4 +1,3 @@
-// OrderNotFoundException.java
 package org.acs.stuco.backend.exceptions;
 
 public class OrderNotFoundException extends RuntimeException

@@ -1,4 +1,3 @@
-// UserResponse.java
 package org.acs.stuco.backend.auth.dto;
 
 public record UserResponse(
@@ -11,3 +10,4 @@ public record UserResponse(
 )
 {
 }
+

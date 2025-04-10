@@ -26,7 +26,8 @@ public class AuthController
     public ResponseEntity<?> register(
             @Valid @RequestPart("user") RegisterRequest request,
             @RequestPart(value = "avatar", required = false) MultipartFile avatar
-    ) {
+    )
+    {
         String fullName = request.firstName() + " " + request.lastName();
         return authService.register(request.email(), fullName, request.password(), avatar);
     }
@@ -53,9 +54,10 @@ public class AuthController
                 user.getEmail(),
                 user.getAvatarUrl(),
                 user.getRole().ordinal(),
-                user.isEmailVerified()   // Include email verification status
+                user.isEmailVerified()
         ));
     }
 
 }
+
 

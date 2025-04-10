@@ -22,7 +22,6 @@ public class ArchivedOrder
     @Id
     private Long id;
 
-    // Make product optional
     @ManyToOne
     @JoinColumn(nullable = true)  // was nullable = false
     private Product product;
@@ -50,7 +49,6 @@ public class ArchivedOrder
     @ManyToOne
     private User assignedRep;
 
-    // --- NEW FIELDS ---
     @Lob
     private String instructions;
 
@@ -59,11 +57,11 @@ public class ArchivedOrder
 
     @Column(precision = 19, scale = 4)
     private BigDecimal productPrice;
-    // -------------------
+
 
     public BigDecimal getTotalPrice()
     {
-        // same fallback logic
+
         if (product != null)
         {
             return product.getPrice().multiply(BigDecimal.valueOf(quantity));
@@ -75,4 +73,5 @@ public class ArchivedOrder
         return BigDecimal.ZERO;
     }
 }
+
 

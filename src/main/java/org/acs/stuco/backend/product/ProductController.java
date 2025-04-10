@@ -27,22 +27,18 @@ public class ProductController
         this.objectMapper = objectMapper;
     }
 
-    // GET /api/products - List available products (available != 0) with pagination
     @GetMapping
     public ResponseEntity<Page<Product>> listAvailableProducts(Pageable pageable)
     {
         return ResponseEntity.ok(productService.getAvailableProducts(pageable));
     }
 
-    // GET /api/products/all - List all products (admin) with pagination
     @GetMapping("/all")
-    @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Page<Product>> listAllProducts(Pageable pageable)
     {
         return ResponseEntity.ok(productService.getAllProducts(pageable));
     }
 
-    // GET /api/products/{id} - Get product detail if available
     @GetMapping("/{id}")
     public ResponseEntity<Product> getProduct(@PathVariable Long id)
     {
@@ -51,7 +47,6 @@ public class ProductController
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // POST /api/products - Create new product (StuCo+ only)
     @PostMapping
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Product> createProduct(
@@ -62,7 +57,6 @@ public class ProductController
         return ResponseEntity.ok(productService.createProduct(product));
     }
 
-    // PUT /api/products/{id} - Full product update (StuCo+ only)
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Product> updateProduct(
@@ -79,19 +73,15 @@ public class ProductController
             @RequestPart("product") String productJson,
             @RequestPart(value = "file", required = false) MultipartFile file) throws IOException
     {
-        // Convert the JSON string to a Product object.
         Product updatedProduct = objectMapper.readValue(productJson, Product.class);
-        // If a new image file is provided, upload it and update the imageUrl.
         if (file != null && !file.isEmpty())
         {
             String imageUrl = productService.getUploadService().upload(file);
             updatedProduct.setImageUrl(imageUrl);
         }
-        // Update the product using your existing service method.
         return ResponseEntity.ok(productService.updateProduct(id, updatedProduct));
     }
 
-    // PATCH /api/products/{id} - Partial product update (StuCo+ only)
     @PatchMapping("/{id}")
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Product> patchProduct(
@@ -101,7 +91,6 @@ public class ProductController
         return ResponseEntity.ok(productService.patchProduct(id, partialProduct));
     }
 
-    // DELETE /api/products/{id} - Delete product (StuCo+ only)
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Void> deleteProduct(@PathVariable Long id)
@@ -110,7 +99,6 @@ public class ProductController
         return ResponseEntity.noContent().build();
     }
 
-    // POST /api/products/cleanup - Delete out-of-stock products (StuCo+ only)
     @PostMapping("/cleanup")
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Void> cleanUpOutOfStock()
@@ -119,7 +107,6 @@ public class ProductController
         return ResponseEntity.noContent().build();
     }
 
-    // POST /api/products/{id}/upload-image - Upload product image (StuCo+ only)
     @PostMapping(value = "/{id}/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Product> uploadProductImage(
@@ -129,7 +116,6 @@ public class ProductController
         return ResponseEntity.ok(productService.uploadProductImage(id, file));
     }
 
-    // POST /api/products/{id}/reduce-stock - Reduce product stock
     @PostMapping("/{id}/reduce-stock")
     public ResponseEntity<Void> reduceStock(
             @PathVariable Long id,
@@ -143,4 +129,5 @@ public class ProductController
         return ResponseEntity.ok().build();
     }
 }
+
 

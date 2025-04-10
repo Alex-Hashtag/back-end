@@ -4,3 +4,4 @@ public enum Role
 {
     USER, CLASS_REP, STUCO, ADMIN
 }
+

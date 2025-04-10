@@ -71,7 +71,6 @@ public class OrderController
         return ResponseEntity.ok(orderService.getAssignedOrders(rep.getId(), pageable));
     }
 
-    // New endpoint to fetch archived orders
     @GetMapping("/archived")
     @PreAuthorize("hasRole('STUCO') or hasRole('ADMIN')")
     public ResponseEntity<Page<ArchivedOrder>> getArchivedOrders(Pageable pageable)
@@ -79,4 +78,5 @@ public class OrderController
         return ResponseEntity.ok(orderService.getArchivedOrders(pageable));
     }
 }
+
 

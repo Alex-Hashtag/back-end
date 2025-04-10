@@ -1,7 +1,6 @@
 package org.acs.stuco.backend.scheduled;
 
 import org.acs.stuco.backend.order.OrderService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -9,8 +8,12 @@ import org.springframework.stereotype.Component;
 @Component("scheduledOrderArchiveTask")
 public class OrderArchiveTask
 {
-    @Autowired
-    private OrderService orderService;
+    private final OrderService orderService;
+
+    public OrderArchiveTask(OrderService orderService)
+    {
+        this.orderService = orderService;
+    }
 
     @Scheduled(cron = "0 0 3 * * ?")
     public void archiveOldDeliveredOrders()
@@ -18,3 +21,4 @@ public class OrderArchiveTask
         orderService.archiveDeliveredOrders();
     }
 }
+

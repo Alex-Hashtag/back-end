@@ -1,4 +1,3 @@
-// User.java
 package org.acs.stuco.backend.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -11,7 +10,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 
-// Updated User entity
 @Entity
 @Table(name = "users")
 @Getter

@@ -1,4 +1,3 @@
-// NewsPost.java
 package org.acs.stuco.backend.news;
 
 import jakarta.persistence.*;
@@ -36,3 +35,4 @@ public class NewsPost
     private LocalDateTime createdAt = LocalDateTime.now();
 
 }
+
