@@ -83,32 +83,27 @@ class OrderControllerIntegrationTest
     @BeforeEach
     void setUp()
     {
-        // Clear any existing data
+
         orderRepository.deleteAll();
         archivedOrderRepository.deleteAll();
         productRepository.deleteAll();
 
-        // Create test users with different roles
         regularUser = createUser("regular@acsbg.org", "Regular User", Role.USER);
         repUser = createUser("rep@acsbg.org", "Rep User", Role.CLASS_REP);
         stucoUser = createUser("stuco@acsbg.org", "Stuco User", Role.STUCO);
         adminUser = createUser("admin@acsbg.org", "Admin User", Role.ADMIN);
 
-        // Generate tokens for later use
         regularUserToken = "Bearer " + jwtService.generateToken(regularUser);
         repUserToken = "Bearer " + jwtService.generateToken(repUser);
         stucoUserToken = "Bearer " + jwtService.generateToken(stucoUser);
         adminUserToken = "Bearer " + jwtService.generateToken(adminUser);
 
-        // Create test products
         testProduct = createProduct("Regular Product", "This is a regular product", new BigDecimal("25.99"), 50);
         limitedProduct = createProduct("Limited Product", "This product has limited stock", new BigDecimal("39.99"), 3);
         unlimitedProduct = createProduct("Unlimited Product", "This product has unlimited stock", new BigDecimal("15.99"), -1);
 
-        // Create a test order
         testOrder = createOrder(testProduct, regularUser, 2, OrderStatus.PENDING, PaymentType.CASH);
 
-        // Create an archived order for testing
         archivedOrder = createArchivedOrder();
     }
 
@@ -172,13 +167,12 @@ class OrderControllerIntegrationTest
     @DisplayName("POST /api/orders should create order with unlimited stock product")
     void createOrderShouldCreateWithUnlimitedStockProduct() throws Exception
     {
-        // Create request object
+
         Order newOrder = new Order();
         newOrder.setProduct(unlimitedProduct);
         newOrder.setQuantity(100); // Large quantity for unlimited stock
         newOrder.setPaymentType(PaymentType.PREPAID);
 
-        // Perform request with regular user
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(newOrder))
@@ -187,7 +181,6 @@ class OrderControllerIntegrationTest
                 .andExpect(jsonPath("$.quantity").value(100))
                 .andExpect(jsonPath("$.paymentType").value("PREPAID"));
 
-        // Verify product stock remains unlimited (-1)
         Product unchangedProduct = productRepository.findById(unlimitedProduct.getId()).orElseThrow();
         assertThat(unchangedProduct.getAvailable()).isEqualTo(-1);
     }
@@ -196,14 +189,13 @@ class OrderControllerIntegrationTest
     @DisplayName("POST /api/orders should create order with custom product details")
     void createOrderShouldCreateWithCustomProductDetails() throws Exception
     {
-        // Create request object with custom product details
+
         Order newOrder = new Order();
         newOrder.setProductName("Custom T-Shirt");
         newOrder.setProductPrice(new BigDecimal("20.00"));
         newOrder.setQuantity(1);
         newOrder.setPaymentType(PaymentType.CASH);
 
-        // Perform request with regular user
         mockMvc.perform(post("/api/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(newOrder))
@@ -219,7 +211,7 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders should return user's orders")
     void getUserOrdersShouldReturnUserOrders() throws Exception
     {
-        // Perform request with regular user
+
         mockMvc.perform(get("/api/orders")
                         .header("Authorization", regularUserToken))
                 .andExpect(status().isOk())
@@ -232,10 +224,9 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders/admin should return all orders when authorized")
     void getAllOrdersShouldReturnAllOrdersWhenAuthorized() throws Exception
     {
-        // Create a second order for a different user
+
         createOrder(unlimitedProduct, repUser, 3, OrderStatus.PAID, PaymentType.PREPAID);
 
-        // Perform request with STUCO user (authorized)
         mockMvc.perform(get("/api/orders/admin")
                         .header("Authorization", stucoUserToken))
                 .andExpect(status().isOk())
@@ -244,7 +235,6 @@ class OrderControllerIntegrationTest
                         regularUser.getId().intValue(),
                         repUser.getId().intValue())));
 
-        // Perform request with ADMIN user (also authorized)
         mockMvc.perform(get("/api/orders/admin")
                         .header("Authorization", adminUserToken))
                 .andExpect(status().isOk())
@@ -255,12 +245,11 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders/admin should return 403 when unauthorized")
     void getAllOrdersShouldReturn403WhenUnauthorized() throws Exception
     {
-        // Perform request with regular user (unauthorized)
+
         mockMvc.perform(get("/api/orders/admin")
                         .header("Authorization", regularUserToken))
                 .andExpect(status().isForbidden()); // 403 Forbidden
 
-        // Perform request with REP user (also unauthorized)
         mockMvc.perform(get("/api/orders/admin")
                         .header("Authorization", repUserToken))
                 .andExpect(status().isForbidden()); // 403 Forbidden
@@ -271,11 +260,10 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders/assigned should return orders assigned to rep")
     void getAssignedOrdersShouldReturnOrdersAssignedToRep() throws Exception
     {
-        // Assign the test order to the REP user
+
         testOrder.setAssignedRep(repUser);
         orderRepository.save(testOrder);
 
-        // Perform request with REP user (authorized)
         mockMvc.perform(get("/api/orders/assigned")
                         .header("Authorization", repUserToken))
                 .andExpect(status().isOk())
@@ -288,7 +276,7 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders/assigned should return 403 when not a rep")
     void getAssignedOrdersShouldReturn403WhenNotRep() throws Exception
     {
-        // Perform request with regular user (unauthorized)
+
         mockMvc.perform(get("/api/orders/assigned")
                         .header("Authorization", regularUserToken))
                 .andExpect(status().isForbidden()); // 403 Forbidden
@@ -298,7 +286,7 @@ class OrderControllerIntegrationTest
     @DisplayName("GET /api/orders/archived should return archived orders when authorized")
     void getArchivedOrdersShouldReturnArchivedOrdersWhenAuthorized() throws Exception
     {
-        // Perform request with STUCO user (authorized)
+
         mockMvc.perform(get("/api/orders/archived")
                         .header("Authorization", stucoUserToken))
                 .andExpect(status().isOk())
@@ -307,7 +295,6 @@ class OrderControllerIntegrationTest
                 .andExpect(jsonPath("$.content[0].status").value("DELIVERED"))
                 .andExpect(jsonPath("$.content[0].buyer.id").value(regularUser.getId()));
 
-        // Perform request with ADMIN user (also authorized)
         mockMvc.perform(get("/api/orders/archived")
                         .header("Authorization", adminUserToken))
                 .andExpect(status().isOk())
@@ -315,3 +302,4 @@ class OrderControllerIntegrationTest
     }
 
 }
+

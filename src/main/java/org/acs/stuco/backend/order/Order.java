@@ -23,10 +23,7 @@ public class Order
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    /**
-     * Make product optional (nullable = true).
-     * Use @OnDelete(SET_NULL) for Hibernate to handle it.
-     */
+    
     @ManyToOne
     @JoinColumn(name = "product_id", nullable = true,
             foreignKey = @ForeignKey(name = "FK_orders_product"))
@@ -59,15 +56,12 @@ public class Order
     @Lob
     private String instructions;
 
-    // Store product info at order level so we’re not reliant on the Product being present
     private String productName;
 
     @Column(precision = 19, scale = 4)
     private BigDecimal productPrice;
 
-    /**
-     * Use the in‐table product price if product is gone
-     */
+    
     public BigDecimal getTotalPrice()
     {
         if (product != null)
@@ -81,4 +75,5 @@ public class Order
         return BigDecimal.ZERO;
     }
 }
+
 

@@ -8,3 +8,4 @@ public interface NewsRepository extends JpaRepository<NewsPost, Long>
 
 }
 
+

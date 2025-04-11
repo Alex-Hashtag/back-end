@@ -45,3 +45,4 @@ public interface ProductRepository extends JpaRepository<Product, Long>
     @Query("SELECT p FROM Product p WHERE p.available = -1")
     Page<Product> findUnlimitedStockProducts(Pageable pageable);
 }
+

@@ -36,3 +36,4 @@ public interface OrderRepository extends JpaRepository<Order, Long>
     List<Order> findDeliveredOrdersBefore(@Param("cutoffDate") LocalDateTime cutoffDate);
 
 }
+

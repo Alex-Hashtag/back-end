@@ -7,3 +7,4 @@ public class InsufficientStockException extends RuntimeException
         super("Not enough stock available for this product");
     }
 }
+

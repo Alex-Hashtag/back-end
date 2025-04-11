@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,6 +55,7 @@ public class AuthService
         this.eventPublisher = eventPublisher;
     }
 
+    
     public ResponseEntity<?> register(
             String email,
             String fullName,
@@ -109,6 +111,7 @@ public class AuthService
                 .body("Registration successful! Please check your email to verify.");
     }
 
+    
     @Async
     public CompletableFuture<Void> sendVerificationEmailAsync(String email, String token)
     {
@@ -132,6 +135,7 @@ public class AuthService
         }
     }
 
+    
     public ResponseEntity<?> login(LoginRequest request)
     {
         User user = userRepository.findByEmail(request.email())
@@ -152,6 +156,7 @@ public class AuthService
         return ResponseEntity.ok(Map.of("token", token));
     }
 
+    
     public ResponseEntity<String> verifyEmail(String token)
     {
         User user = userRepository.findByVerificationToken(token)
@@ -166,6 +171,96 @@ public class AuthService
         return ResponseEntity.ok("Email verified successfully!");
     }
 
+    
+    public ResponseEntity<?> forgotPassword(String email)
+    {
+        User user = userRepository.findByEmail(email)
+                .orElse(null);
+
+        if (user == null)
+            return ResponseEntity.ok("Password reset instructions have been sent to your email if it exists in our system.");
+
+        if (!user.isEmailVerified())
+            return ResponseEntity.ok("Password reset instructions have been sent to your email if it exists in our system.");
+
+        String token = UUID.randomUUID().toString();
+        user.setResetPasswordToken(token);
+
+        user.setResetPasswordTokenExpiry(LocalDateTime.now().plusHours(24));
+        userRepository.save(user);
+
+        try {
+            sendPasswordResetEmailAsync(email, token)
+                .exceptionally(ex -> {
+                    logger.error("Failed to send password reset email to {}", email, ex);
+                    return null;
+                });
+                
+            // Print the reset token to the console as a fallback when email service is down
+            logger.info("PASSWORD RESET TOKEN for {}: {} (valid until {})", 
+                email, token, user.getResetPasswordTokenExpiry());
+                
+            return ResponseEntity.ok("Password reset instructions have been sent to your email.");
+        } catch (Exception e) {
+            logger.error("Critical error in password reset flow", e);
+            return ResponseEntity.ok("Password reset instructions have been sent to your email if it exists in our system.");
+        }
+    }
+
+    
+    @Async
+    public CompletableFuture<Void> sendPasswordResetEmailAsync(String email, String token)
+    {
+        try
+        {
+            String resetLink = domain + "reset-password?token=" + token;
+            emailClient.sendEmail(
+                    List.of(email),
+                    List.of(),
+                    List.of(),
+                    "Reset Your Password",
+                    "Please click the following link to reset your password: " + resetLink + "\n\nThis link will expire in 24 hours.",
+                    false,
+                    List.of()
+            );
+            return CompletableFuture.completedFuture(null);
+        } catch (Exception e)
+        {
+            logger.error("Critical: Failed to send password reset email to {}", email, e);
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    
+    public ResponseEntity<?> resetPassword(String token, String newPassword)
+    {
+        if (!isPasswordValid(newPassword))
+        {
+            return ResponseEntity.badRequest()
+                    .body("Password must be at least 8 characters, contain an uppercase letter and a digit.");
+        }
+
+        User user = userRepository.findByResetPasswordToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invalid or expired token"));
+
+        if (user.getResetPasswordTokenExpiry() == null ||
+                LocalDateTime.now().isAfter(user.getResetPasswordTokenExpiry()))
+        {
+            user.setResetPasswordToken(null);
+            user.setResetPasswordTokenExpiry(null);
+            userRepository.save(user);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password reset token has expired");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setResetPasswordToken(null);
+        user.setResetPasswordTokenExpiry(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Your password has been successfully reset.");
+    }
+
+    
     private boolean isPasswordValid(String password)
     {
         if (password.length() < 8) return false;
@@ -173,4 +268,3 @@ public class AuthService
         return password.matches(".*\\d.*");
     }
 }
-

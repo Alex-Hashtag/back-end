@@ -18,10 +18,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEmail(String email);
 
     Optional<User> findByVerificationToken(String token);
+    
+    Optional<User> findByResetPasswordToken(String token);
 
     Page<User> findByRole(Role role, Pageable pageable);
 
     List<User> findByEmailVerified(boolean verified);
 
-    Page<User> findByEmailVerified(boolean verified, Pageable pageable);
 }
+

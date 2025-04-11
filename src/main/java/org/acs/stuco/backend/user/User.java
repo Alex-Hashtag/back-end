@@ -38,6 +38,11 @@ public class User
 
     @Column(unique = true)
     private String verificationToken;
+    
+    @Column(unique = true)
+    private String resetPasswordToken;
+    
+    private LocalDateTime resetPasswordTokenExpiry;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal collectedBalance = BigDecimal.ZERO;
@@ -46,3 +51,4 @@ public class User
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 }
+
