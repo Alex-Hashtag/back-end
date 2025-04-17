@@ -11,7 +11,9 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
+/**
+ * Repository for orders
+ */
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long>
 {
@@ -29,11 +31,18 @@ public interface OrderRepository extends JpaRepository<Order, Long>
     @Query("UPDATE Order o SET o.status = :status WHERE o.id = :id")
     int updateStatus(Long id, OrderStatus status);
 
-    @Query("SELECT COUNT(o), SUM(o.quantity), SUM(o.getTotalPrice()) FROM Order o WHERE o.status = 'DELIVERED'")
+    /**
+     * Gets statistics about delivered orders:
+     * - Count of delivered orders
+     * - Sum of quantities of all delivered orders
+     * - Sum of total prices of all delivered orders (quantity * unit price)
+     * 
+     * @return Object array with [count, quantity sum, price sum]
+     */
+    @Query("SELECT COUNT(o), SUM(o.quantity), SUM(o.quantity * o.productPrice) FROM Order o WHERE o.status = 'DELIVERED'")
     Object[] getOrderStatistics();
 
     @Query("SELECT o FROM Order o WHERE o.status = 'DELIVERED' AND o.paidAt < :cutoffDate")
     List<Order> findDeliveredOrdersBefore(@Param("cutoffDate") LocalDateTime cutoffDate);
 
 }
-
