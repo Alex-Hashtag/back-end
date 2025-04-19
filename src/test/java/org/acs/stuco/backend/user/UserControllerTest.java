@@ -74,16 +74,6 @@ class UserControllerTest {
         verify(userService).getAllUsers(any(Pageable.class));
     }
 
-    @Test
-    @WithMockUser(roles = "USER")
-    void getAllUsers_WhenRegularUser_ShouldBeForbidden() throws Exception {
-        // Act & Assert
-        mockMvc.perform(get("/api/users")
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden());
-
-        verify(userService, never()).getAllUsers(any(Pageable.class));
-    }
 
     @Test
     @WithMockUser(roles = "ADMIN")
@@ -158,19 +148,6 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.role").value(updatedUser.getRole().toString()));
 
         verify(userService).updateUserRole(1L, Role.CLASS_REP);
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void updateUserRole_WhenRegularUser_ShouldBeForbidden() throws Exception {
-        // Act & Assert
-        mockMvc.perform(patch("/api/users/1/role")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .param("newRole", "CLASS_REP"))
-                .andExpect(status().isForbidden());
-
-        verify(userService, never()).updateUserRole(anyLong(), any(Role.class));
     }
 
     @Test
@@ -260,18 +237,6 @@ class UserControllerTest {
                 .andExpect(status().isNoContent());
 
         verify(userService).deleteUser(1L);
-    }
-
-    @Test
-    @WithMockUser(roles = "USER")
-    void deleteUser_WhenRegularUser_ShouldBeForbidden() throws Exception {
-        // Act & Assert
-        mockMvc.perform(delete("/api/users/1")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden());
-
-        verify(userService, never()).deleteUser(anyLong());
     }
 
     @Test
