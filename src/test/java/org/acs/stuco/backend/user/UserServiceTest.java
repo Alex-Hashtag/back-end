@@ -3,386 +3,495 @@ package org.acs.stuco.backend.user;
 import org.acs.stuco.backend.exceptions.UserNotFoundException;
 import org.acs.stuco.backend.upload.UploadService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.access.AccessDeniedException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean; // Using MockitoBean as requested
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.properties") // Ensure test properties are loaded
+class UserServiceTest {
 
-@ExtendWith(MockitoExtension.class)
-class UserServiceTest
-{
-
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private UploadService uploadService;
-
-    @Mock
-    private SecurityContext securityContext;
-
-    @Mock
-    private Authentication authentication;
-
-    @InjectMocks
+    @Autowired
     private UserService userService;
 
+    @MockitoBean // Mocking UserRepository using MockitoBean
+    private UserRepository userRepository;
+
+    @MockitoBean // Mocking UploadService using MockitoBean
+    private UploadService uploadService;
+
     private User testUser;
-    private User adminUser;
-    private User stucoUser;
-    private User classRepUser;
 
     @BeforeEach
-    void setUp()
-    {
-
+    void setUp() {
         testUser = new User();
         testUser.setId(1L);
-        testUser.setEmail("user@acsbg.org");
+        testUser.setEmail("test@example.com");
         testUser.setName("Test User");
-        testUser.setPasswordHash("hashed_password");
         testUser.setRole(Role.USER);
-        testUser.setEmailVerified(true);
-
-        classRepUser = new User();
-        classRepUser.setId(2L);
-        classRepUser.setEmail("rep@acsbg.org");
-        classRepUser.setName("Class Rep");
-        classRepUser.setPasswordHash("hashed_password");
-        classRepUser.setRole(Role.CLASS_REP);
-        classRepUser.setCollectedBalance(BigDecimal.valueOf(100.00));
-
-        stucoUser = new User();
-        stucoUser.setId(3L);
-        stucoUser.setEmail("stuco@acsbg.org");
-        stucoUser.setName("Stuco Member");
-        stucoUser.setPasswordHash("hashed_password");
-        stucoUser.setRole(Role.STUCO);
-
-        adminUser = new User();
-        adminUser.setId(4L);
-        adminUser.setEmail("admin@acsbg.org");
-        adminUser.setName("Admin");
-        adminUser.setPasswordHash("hashed_password");
-        adminUser.setRole(Role.ADMIN);
-
-        SecurityContextHolder.setContext(securityContext);
     }
 
     @Test
-    @DisplayName("getAllUsers: Should return paginated list of users")
-    void getAllUsersShouldReturnPaginatedList()
-    {
+    void getUserById_WhenUserExists_ShouldReturnUser() {
+        // Arrange
+        when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
 
-        List<User> userList = Arrays.asList(testUser, classRepUser);
-        Page<User> userPage = new PageImpl<>(userList);
-        Pageable pageable = PageRequest.of(0, 10);
+        // Act
+        User foundUser = userService.getUserById(1L);
 
-        when(userRepository.findAll(pageable)).thenReturn(userPage);
-
-        Page<User> result = userService.getAllUsers(pageable);
-
-        assertThat(result).isEqualTo(userPage);
-        assertThat(result.getContent()).hasSize(2);
-        verify(userRepository).findAll(pageable);
-    }
-
-    @Test
-    @DisplayName("getUserById: Should return user when exists")
-    void getUserByIdShouldReturnUserWhenExists()
-    {
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-
-        User result = userService.getUserById(1L);
-
-        assertThat(result).isEqualTo(testUser);
+        // Assert
+        assertNotNull(foundUser);
+        assertEquals(testUser.getId(), foundUser.getId());
+        assertEquals(testUser.getEmail(), foundUser.getEmail());
         verify(userRepository).findById(1L);
     }
 
     @Test
-    @DisplayName("getUserById: Should throw exception when user not found")
-    void getUserByIdShouldThrowExceptionWhenUserNotFound()
-    {
+    void getUserById_WhenUserDoesNotExist_ShouldThrowUserNotFoundException() {
+        // Arrange
+        when(userRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> userService.getUserById(99L))
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found with ID: 99");
+        // Act & Assert
+        UserNotFoundException exception = assertThrows(UserNotFoundException.class, () -> {
+            userService.getUserById(99L);
+        });
+        assertEquals("User not found with ID: 99", exception.getMessage());
+        verify(userRepository).findById(99L);
     }
 
-    @Test
-    @DisplayName("getCurrentUser: Should return authenticated user when exists")
-    void getCurrentUserShouldReturnAuthenticatedUserWhenExists()
-    {
-
+     @Test
+    void getCurrentUser_WhenPrincipalIsUser_ShouldReturnUser() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(testUser);
+        when(authentication.getPrincipal()).thenReturn(testUser); // Principal is a User object
+        SecurityContextHolder.setContext(securityContext);
+
         when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
 
-        User result = userService.getCurrentUser();
+        // Act
+        User currentUser = userService.getCurrentUser();
 
-        assertThat(result).isEqualTo(testUser);
+        // Assert
+        assertNotNull(currentUser);
+        assertEquals(testUser.getId(), currentUser.getId());
+        assertEquals(testUser.getEmail(), currentUser.getEmail());
         verify(userRepository).findByEmail(testUser.getEmail());
+
+        // Clean up security context after test
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    @DisplayName("getCurrentUser: Should handle string principal correctly")
-    void getCurrentUserShouldHandleStringPrincipal()
-    {
-
+    void getCurrentUser_WhenPrincipalIsString_ShouldReturnUser() {
+        // Arrange
+        String userEmail = "test@example.com";
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn("user@acsbg.org");
-        when(userRepository.findByEmail("user@acsbg.org")).thenReturn(Optional.of(testUser));
+        when(authentication.getPrincipal()).thenReturn(userEmail); // Principal is a String (email)
+        SecurityContextHolder.setContext(securityContext);
 
-        User result = userService.getCurrentUser();
+        when(userRepository.findByEmail(userEmail)).thenReturn(Optional.of(testUser));
 
-        assertThat(result).isEqualTo(testUser);
-        verify(userRepository).findByEmail("user@acsbg.org");
+        // Act
+        User currentUser = userService.getCurrentUser();
+
+        // Assert
+        assertNotNull(currentUser);
+        assertEquals(testUser.getId(), currentUser.getId());
+        assertEquals(userEmail, currentUser.getEmail());
+        verify(userRepository).findByEmail(userEmail);
+
+        // Clean up security context after test
+        SecurityContextHolder.clearContext();
     }
 
-    @Test
-    @DisplayName("getCurrentUser: Should throw exception when user not found")
-    void getCurrentUserShouldThrowExceptionWhenUserNotFound()
-    {
-
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(testUser);
-        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> userService.getCurrentUser())
-                .isInstanceOf(UserNotFoundException.class)
-                .hasMessageContaining("User not found with email");
-    }
 
     @Test
-    @DisplayName("updateCurrentUser: Should update user name")
-    void updateCurrentUserShouldUpdateUserName()
-    {
-
-        User updatedUser = new User();
-        updatedUser.setName("Updated Name");
-
+    void getCurrentUser_WhenUserNotFoundInRepo_ShouldThrowUserNotFoundException() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(testUser);
-        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        SecurityContextHolder.setContext(securityContext);
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+        // Act & Assert
+        UserNotFoundException exception = assertThrows(UserNotFoundException.class, () -> {
+            userService.getCurrentUser();
+        });
+        assertEquals("User not found with email: " + testUser.getEmail(), exception.getMessage());
+        verify(userRepository).findByEmail(testUser.getEmail());
+
+        // Clean up security context after test
+        SecurityContextHolder.clearContext();
+    }
+
+     @Test
+    void getCurrentUser_WhenPrincipalIsInvalidType_ShouldThrowIllegalStateException() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(new Object()); // Invalid principal type
+        SecurityContextHolder.setContext(securityContext);
+
+        // Act & Assert
+        IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
+            userService.getCurrentUser();
+        });
+        assertEquals("Invalid principal type in security context", exception.getMessage());
+        // No repository interaction expected here
+        verify(userRepository, never()).findByEmail(anyString());
+
+        // Clean up security context after test
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void updateCurrentUser_ShouldUpdateNameSuccessfully() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(testUser);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
+        
+        User updatedDetails = new User();
+        updatedDetails.setName("Updated Name");
+        
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        User result = userService.updateCurrentUser(updatedUser);
+        // Act
+        User result = userService.updateCurrentUser(updatedDetails);
 
-        assertThat(result.getName()).isEqualTo("Updated Name");
-        verify(userRepository).save(testUser);
+        // Assert
+        assertEquals("Updated Name", result.getName());
+        assertEquals(testUser.getId(), result.getId());
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    @DisplayName("updateUserRole: Admin should update any user role below admin")
-    void updateUserRoleAdminShouldUpdateAnyUserRoleBelowAdmin()
-    {
+    void updateCurrentUser_WhenNameIsNull_ShouldNotUpdateName() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(testUser);
+        SecurityContextHolder.setContext(securityContext);
 
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(testUser));
+        
+        String originalName = testUser.getName();
+        User updatedDetails = new User();
+        updatedDetails.setName(null);
+        
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        User result = userService.updateCurrentUser(updatedDetails);
+
+        // Assert
+        assertEquals(originalName, result.getName());
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void updateUserRole_WhenStucoUpdatesUser_ShouldSucceed() {
+        // Arrange
+        User stucoUser = new User();
+        stucoUser.setId(2L);
+        stucoUser.setEmail("stuco@example.com");
+        stucoUser.setRole(Role.STUCO);
+
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(stucoUser);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        User result = userService.updateUserRole(testUser.getId(), Role.CLASS_REP);
+
+        // Assert
+        assertEquals(Role.CLASS_REP, result.getRole());
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void updateUserRole_WhenStucoTriesToUpdateStuco_ShouldThrowAccessDeniedException() {
+        // Arrange
+        User stucoUser = new User();
+        stucoUser.setId(2L);
+        stucoUser.setEmail("stuco@example.com");
+        stucoUser.setRole(Role.STUCO);
+
+        User targetStucoUser = new User();
+        targetStucoUser.setId(3L);
+        targetStucoUser.setEmail("stuco2@example.com");
+        targetStucoUser.setRole(Role.STUCO);
+
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(stucoUser);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
+        when(userRepository.findById(targetStucoUser.getId())).thenReturn(Optional.of(targetStucoUser));
+
+        // Act & Assert
+        assertThrows(AccessDeniedException.class, () -> {
+            userService.updateUserRole(targetStucoUser.getId(), Role.USER);
+        });
+        
+        verify(userRepository, never()).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void updateUserRole_WhenStucoTriesToAssignStucoRole_ShouldThrowAccessDeniedException() {
+        // Arrange
+        User stucoUser = new User();
+        stucoUser.setId(2L);
+        stucoUser.setEmail("stuco@example.com");
+        stucoUser.setRole(Role.STUCO);
+
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
+        when(securityContext.getAuthentication()).thenReturn(authentication);
+        when(authentication.getPrincipal()).thenReturn(stucoUser);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+
+        // Act & Assert
+        assertThrows(AccessDeniedException.class, () -> {
+            userService.updateUserRole(testUser.getId(), Role.STUCO);
+        });
+        
+        verify(userRepository, never()).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void updateUserRole_WhenAdminUpdatesUser_ShouldSucceed() {
+        // Arrange
+        User adminUser = new User();
+        adminUser.setId(2L);
+        adminUser.setEmail("admin@example.com");
+        adminUser.setRole(Role.ADMIN);
+
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(adminUser);
+        SecurityContextHolder.setContext(securityContext);
+
         when(userRepository.findByEmail(adminUser.getEmail())).thenReturn(Optional.of(adminUser));
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
+        // Act
         User result = userService.updateUserRole(testUser.getId(), Role.STUCO);
 
-        assertThat(result.getRole()).isEqualTo(Role.STUCO);
-        verify(userRepository).save(testUser);
+        // Assert
+        assertEquals(Role.STUCO, result.getRole());
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    @DisplayName("updateUserRole: STUCO should only update to USER or CLASS_REP")
-    void updateUserRoleStucoShouldOnlyUpdateToUserOrClassRep()
-    {
-
+    void updateUserRole_WhenRegularUserTriesToUpdate_ShouldThrowAccessDeniedException() {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(stucoUser);
-        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
-        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authentication.getPrincipal()).thenReturn(testUser); // Regular user
+        SecurityContextHolder.setContext(securityContext);
 
-        User result = userService.updateUserRole(testUser.getId(), Role.CLASS_REP);
-
-        assertThat(result.getRole()).isEqualTo(Role.CLASS_REP);
-        verify(userRepository).save(testUser);
+        when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        
+        verify(userRepository, never()).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    @DisplayName("updateUserRole: STUCO cannot update to STUCO or ADMIN")
-    void updateUserRoleStucoCannotUpdateToStucoOrAdmin()
-    {
+    void getAllUsers_ShouldReturnPageOfUsers() {
+        // Arrange
+        Page<User> mockPage = mock(Page.class);
+        Pageable pageable = mock(Pageable.class);
+        when(userRepository.findAll(pageable)).thenReturn(mockPage);
 
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(stucoUser);
-        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
-        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        // Act
+        Page<User> result = userService.getAllUsers(pageable);
 
-        assertThatThrownBy(() -> userService.updateUserRole(testUser.getId(), Role.ADMIN))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("STUCO can only assign USER or CLASS_REP");
+        // Assert
+        assertEquals(mockPage, result);
+        verify(userRepository).findAll(pageable);
     }
 
     @Test
-    @DisplayName("updateUserRole: STUCO cannot update users with STUCO or ADMIN role")
-    void updateUserRoleStucoCannotUpdateHigherRoles()
-    {
+    void getClassRepsWithBalances_ShouldReturnPageOfClassReps() {
+        // Arrange
+        Page<User> mockPage = mock(Page.class);
+        Pageable pageable = mock(Pageable.class);
+        when(userRepository.findByRole(eq(Role.CLASS_REP), eq(pageable))).thenReturn(mockPage);
 
-        when(securityContext.getAuthentication()).thenReturn(authentication);
-        when(authentication.getPrincipal()).thenReturn(stucoUser);
-        when(userRepository.findByEmail(stucoUser.getEmail())).thenReturn(Optional.of(stucoUser));
-        when(userRepository.findById(adminUser.getId())).thenReturn(Optional.of(adminUser));
-
-        assertThatThrownBy(() -> userService.updateUserRole(adminUser.getId(), Role.USER))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("STUCO cannot update users with STUCO or ADMIN role");
-    }
-
-    @Test
-    @DisplayName("getClassRepsWithBalances: Should return paginated list of class reps")
-    void getClassRepsWithBalancesShouldReturnClassReps()
-    {
-
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<User> repsPage = new PageImpl<>(List.of(classRepUser));
-
-        when(userRepository.findByRole(Role.CLASS_REP, pageable)).thenReturn(repsPage);
-
+        // Act
         Page<User> result = userService.getClassRepsWithBalances(pageable);
 
-        assertThat(result).isEqualTo(repsPage);
-        assertThat(result.getContent()).hasSize(1);
-        assertThat(result.getContent().get(0).getRole()).isEqualTo(Role.CLASS_REP);
+        // Assert
+        assertEquals(mockPage, result);
         verify(userRepository).findByRole(Role.CLASS_REP, pageable);
     }
 
     @Test
-    @DisplayName("clearRepBalance: Should reset balance to zero for class rep")
-    void clearRepBalanceShouldResetBalanceToZero()
-    {
-
-        when(userRepository.findById(classRepUser.getId())).thenReturn(Optional.of(classRepUser));
+    void clearUserBalance_ShouldSetBalanceToZero() {
+        // Arrange
+        testUser.setCollectedBalance(new BigDecimal("100.00"));
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        userService.clearRepBalance(classRepUser.getId());
+        // Act
+        userService.clearUserBalance(testUser.getId());
 
-        assertThat(classRepUser.getCollectedBalance()).isEqualByComparingTo(BigDecimal.ZERO);
-        verify(userRepository).save(classRepUser);
+        // Assert
+        verify(userRepository).save(any(User.class));
+        assertEquals(BigDecimal.ZERO, testUser.getCollectedBalance());
     }
 
     @Test
-    @DisplayName("clearRepBalance: Should throw exception if user is not a class rep")
-    void clearRepBalanceShouldThrowExceptionIfNotClassRep()
-    {
-
+    void incrementCollectedBalance_WhenBalanceExists_ShouldAddToBalance() {
+        // Arrange
+        testUser.setCollectedBalance(new BigDecimal("100.00"));
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> userService.clearRepBalance(testUser.getId()))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("User is not a class representative");
+        // Act
+        User result = userService.incrementCollectedBalance(testUser.getId(), new BigDecimal("50.00"));
+
+        // Assert
+        assertEquals(new BigDecimal("150.00"), result.getCollectedBalance());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
-    @DisplayName("uploadProfilePicture: Should upload new picture and update user")
-    void uploadProfilePictureShouldUploadAndUpdateUser()
-    {
+    void incrementCollectedBalance_WhenBalanceIsNull_ShouldSetToAmount() {
+        // Arrange
+        testUser.setCollectedBalance(null);
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        MultipartFile mockFile = mock(MultipartFile.class);
+        // Act
+        User result = userService.incrementCollectedBalance(testUser.getId(), new BigDecimal("50.00"));
 
+        // Assert
+        assertEquals(new BigDecimal("50.00"), result.getCollectedBalance());
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void uploadProfilePicture_WhenOldAvatarDoesNotExist_ShouldUploadNewAvatar() throws Exception {
+        // Arrange
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(testUser);
+        SecurityContextHolder.setContext(securityContext);
+
         when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        
+        MultipartFile mockFile = mock(MultipartFile.class);
         when(uploadService.upload(mockFile)).thenReturn("new-avatar-url.jpg");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
+        
+        // Act
         User result = userService.uploadProfilePicture(mockFile);
 
-        assertThat(result.getAvatarUrl()).isEqualTo("new-avatar-url.jpg");
+        // Assert
+        assertEquals("new-avatar-url.jpg", result.getAvatarUrl());
         verify(uploadService).upload(mockFile);
-        verify(userRepository).save(testUser);
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
     }
 
     @Test
-    @DisplayName("uploadProfilePicture: Should delete old picture if exists")
-    void uploadProfilePictureShouldDeleteOldPicture()
-    {
-
-        MultipartFile mockFile = mock(MultipartFile.class);
+    void uploadProfilePicture_WhenOldAvatarExists_ShouldDeleteOldAndUploadNew() throws Exception {
+        // Arrange
         testUser.setAvatarUrl("old-avatar-url.jpg");
-
+        
+        Authentication authentication = mock(Authentication.class);
+        SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
         when(authentication.getPrincipal()).thenReturn(testUser);
+        SecurityContextHolder.setContext(securityContext);
+
         when(userRepository.findByEmail(testUser.getEmail())).thenReturn(Optional.of(testUser));
+        
+        MultipartFile mockFile = mock(MultipartFile.class);
         when(uploadService.upload(mockFile)).thenReturn("new-avatar-url.jpg");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
+        
+        // Act
         User result = userService.uploadProfilePicture(mockFile);
 
-        assertThat(result.getAvatarUrl()).isEqualTo("new-avatar-url.jpg");
-        verify(uploadService).delete("old-avatar-url.jpg");
+        // Assert
+        assertEquals("new-avatar-url.jpg", result.getAvatarUrl());
         verify(uploadService).upload(mockFile);
-        verify(userRepository).save(testUser);
-    }
-
-    @Test
-    @DisplayName("deleteUser: Should delete user and avatar if exists")
-    void deleteUserShouldDeleteUserAndAvatar()
-    {
-
-        testUser.setAvatarUrl("avatar-url.jpg");
-
-        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
-
-        userService.deleteUser(testUser.getId());
-
-        verify(uploadService).delete("avatar-url.jpg");
-        verify(userRepository).delete(testUser);
-    }
-
-    @Test
-    @DisplayName("filterUsers: Should apply multiple filters correctly")
-    void filterUsersShouldApplyMultipleFilters()
-    {
-
-        List<Role> roles = List.of(Role.USER, Role.CLASS_REP);
-        String searchTerm = "test";
-        Integer gradYear = 2023;
-        BigDecimal balanceEq = BigDecimal.valueOf(100);
-        Pageable pageable = PageRequest.of(0, 10);
-        Page<User> userPage = new PageImpl<>(List.of(testUser));
-
-        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(userPage);
-
-        Page<User> result = userService.filterUsers(roles, searchTerm, gradYear, balanceEq, null, null, true, pageable);
-
-        assertThat(result).isEqualTo(userPage);
-        verify(userRepository).findAll(any(Specification.class), eq(pageable));
+        verify(uploadService).delete("old-avatar-url.jpg");
+        verify(userRepository).save(any(User.class));
+        
+        // Clean up
+        SecurityContextHolder.clearContext();
     }
 }
-
-

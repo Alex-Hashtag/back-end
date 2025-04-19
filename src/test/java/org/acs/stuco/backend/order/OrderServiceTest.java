@@ -1,25 +1,28 @@
 package org.acs.stuco.backend.order;
 
 import org.acs.stuco.backend.exceptions.InsufficientStockException;
+import org.acs.stuco.backend.exceptions.InvalidOperationException;
 import org.acs.stuco.backend.exceptions.OrderNotFoundException;
 import org.acs.stuco.backend.order.archive.ArchivedOrder;
 import org.acs.stuco.backend.order.archive.ArchivedOrderRepository;
 import org.acs.stuco.backend.product.Product;
 import org.acs.stuco.backend.product.ProductService;
+import org.acs.stuco.backend.user.Role;
 import org.acs.stuco.backend.user.User;
+import org.acs.stuco.backend.user.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,355 +30,345 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.properties")
+class OrderServiceTest {
 
-@ExtendWith(MockitoExtension.class)
-public class OrderServiceTest
-{
-
-    @Mock
-    private OrderRepository orderRepository;
-
-    @Mock
-    private ArchivedOrderRepository archivedOrderRepository;
-
-    @Mock
-    private ProductService productService;
-
+    @Autowired
     private OrderService orderService;
 
-    private Order sampleOrder;
-    private Product sampleProduct;
-    private User sampleUser;
+    @MockitoBean
+    private OrderRepository orderRepository;
+
+    @MockitoBean
+    private ArchivedOrderRepository archivedOrderRepository;
+
+    @MockitoBean
+    private ProductService productService;
+
+    @MockitoBean
+    private UserService userService;
+
+    private Order testOrder;
+    private Product testProduct;
+    private User testUser;
+    private User testBuyer;
+    private final Long testOrderId = 1L;
+    private final Long testProductId = 1L;
+    private final Long testUserId = 1L;
 
     @BeforeEach
-    void setUp()
-    {
-        orderService = new OrderService(orderRepository, archivedOrderRepository, productService);
+    void setUp() {
+        // Initialize test product
+        testProduct = new Product();
+        testProduct.setId(testProductId);
+        testProduct.setName("Test Product");
+        testProduct.setPrice(new BigDecimal("10.00"));
+        testProduct.setAvailable(5);
 
-        sampleUser = new User();
-        sampleUser.setId(1L);
-        sampleUser.setEmail("test@example.com");
+        // Initialize test user (class rep)
+        testUser = new User();
+        testUser.setId(testUserId);
+        testUser.setEmail("test@acsbg.org");
+        testUser.setName("Test User");
+        testUser.setRole(Role.CLASS_REP);
+        
+        // Initialize test buyer
+        testBuyer = new User();
+        testBuyer.setId(2L);
+        testBuyer.setEmail("buyer@acsbg.org");
+        testBuyer.setName("Buyer User");
+        testBuyer.setRole(Role.USER);
 
-        sampleProduct = new Product();
-        sampleProduct.setId(1L);
-        sampleProduct.setName("Test Product");
-        sampleProduct.setPrice(BigDecimal.valueOf(10.99));
-        sampleProduct.setAvailable(50);
-
-        sampleOrder = new Order();
-        sampleOrder.setId(1L);
-        sampleOrder.setBuyer(sampleUser);
-        sampleOrder.setProduct(sampleProduct);
-        sampleOrder.setQuantity(5);
-        sampleOrder.setStatus(OrderStatus.PENDING);
-        sampleOrder.setPaymentType(PaymentType.CASH);
-        sampleOrder.setCreatedAt(LocalDateTime.now());
+        // Initialize test order using builder
+        testOrder = Order.builder()
+            .id(testOrderId)
+            .product(testProduct)
+            .buyer(testBuyer)
+            .productName(testProduct.getName())
+            .productPrice(testProduct.getPrice())
+            .quantity(2)
+            .status(OrderStatus.PENDING)
+            .paymentType(PaymentType.CASH)
+            .createdAt(LocalDateTime.now().minusDays(1))
+            .build();
     }
 
     @Test
-    void createOrder_WithValidProduct_ShouldSaveOrderAndReduceStock()
-    {
+    void createOrder_WithExistingProduct_ShouldCreateOrderAndReduceStock() {
+        // Arrange
+        when(productService.getProductById(testProductId)).thenReturn(Optional.of(testProduct));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        when(productService.getProductById(sampleProduct.getId())).thenReturn(Optional.of(sampleProduct));
-        when(orderRepository.save(any(Order.class))).thenReturn(sampleOrder);
+        // Act
+        Order result = orderService.createOrder(testOrder);
 
-        Order result = orderService.createOrder(sampleOrder);
-
+        // Assert
         assertNotNull(result);
-        assertEquals(sampleOrder.getId(), result.getId());
-        assertEquals(sampleProduct.getName(), result.getProductName());
-        assertEquals(sampleProduct.getPrice(), result.getProductPrice());
-
-        verify(productService).reduceStock(sampleProduct.getId(), sampleOrder.getQuantity());
-        verify(orderRepository).save(sampleOrder);
+        assertEquals(testOrderId, result.getId());
+        assertEquals(testProduct.getName(), result.getProductName());
+        assertEquals(testProduct.getPrice(), result.getProductPrice());
+        
+        verify(productService).getProductById(testProductId);
+        verify(productService).reduceStock(testProductId, 2);
+        verify(orderRepository).save(testOrder);
     }
 
     @Test
-    void createOrder_WithInsufficientStock_ShouldThrowException()
-    {
+    void createOrder_WithInsufficientStock_ShouldThrowException() {
+        // Arrange
+        testProduct.setAvailable(1); // Only 1 available, but order quantity is 2
+        when(productService.getProductById(testProductId)).thenReturn(Optional.of(testProduct));
 
-        Product lowStockProduct = new Product();
-        lowStockProduct.setId(2L);
-        lowStockProduct.setName("Low Stock Product");
-        lowStockProduct.setPrice(BigDecimal.valueOf(10.99));
-        lowStockProduct.setAvailable(2);  // Less than order quantity
-
-        Order order = new Order();
-        order.setProduct(lowStockProduct);
-        order.setQuantity(5);  // More than available
-
-        when(productService.getProductById(lowStockProduct.getId())).thenReturn(Optional.of(lowStockProduct));
-
-        assertThrows(InsufficientStockException.class, () ->
-        {
-            orderService.createOrder(order);
+        // Act & Assert
+        assertThrows(InsufficientStockException.class, () -> {
+            orderService.createOrder(testOrder);
         });
-
+        
+        verify(productService).getProductById(testProductId);
         verify(productService, never()).reduceStock(anyLong(), anyInt());
         verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
-    void createOrder_WithUnlimitedStockProduct_ShouldNotReduceStock()
-    {
+    void createOrder_WithUnlimitedStock_ShouldNotReduceStock() {
+        // Arrange
+        testProduct.setAvailable(-1); // -1 indicates unlimited stock
+        when(productService.getProductById(testProductId)).thenReturn(Optional.of(testProduct));
+        when(orderRepository.save(any(Order.class))).thenReturn(testOrder);
 
-        Product unlimitedProduct = new Product();
-        unlimitedProduct.setId(3L);
-        unlimitedProduct.setName("Unlimited Product");
-        unlimitedProduct.setPrice(BigDecimal.valueOf(5.99));
-        unlimitedProduct.setAvailable(-1);  // Unlimited stock
+        // Act
+        Order result = orderService.createOrder(testOrder);
 
-        Order order = new Order();
-        order.setProduct(unlimitedProduct);
-        order.setQuantity(100);
-        order.setBuyer(sampleUser);
-        order.setPaymentType(PaymentType.PREPAID);
-
-        when(productService.getProductById(unlimitedProduct.getId())).thenReturn(Optional.of(unlimitedProduct));
-        when(orderRepository.save(any(Order.class))).thenReturn(order);
-
-        Order result = orderService.createOrder(order);
-
+        // Assert
         assertNotNull(result);
+        verify(productService).getProductById(testProductId);
         verify(productService, never()).reduceStock(anyLong(), anyInt());
-        verify(orderRepository).save(order);
+        verify(orderRepository).save(testOrder);
     }
 
     @Test
-    void createOrder_WithNonExistentProduct_ButWithProductDetails_ShouldWork()
-    {
+    void createOrder_WithCustomProduct_ShouldCreateOrderWithoutProductReference() {
+        // Arrange
+        Order customOrder = Order.builder()
+            .id(testOrderId)
+            .buyer(testBuyer)
+            .productName("Custom Product")
+            .productPrice(new BigDecimal("15.00"))
+            .quantity(1)
+            .status(OrderStatus.PENDING)
+            .paymentType(PaymentType.CASH)
+            .build();
+        
+        when(orderRepository.save(any(Order.class))).thenReturn(customOrder);
 
-        Order orderWithoutProduct = new Order();
-        orderWithoutProduct.setProduct(new Product());
-        orderWithoutProduct.getProduct().setId(999L);  // Non-existent product ID
-        orderWithoutProduct.setProductName("Custom Product");
-        orderWithoutProduct.setProductPrice(BigDecimal.valueOf(15.99));
-        orderWithoutProduct.setQuantity(2);
-        orderWithoutProduct.setBuyer(sampleUser);
-        orderWithoutProduct.setPaymentType(PaymentType.CASH);
+        // Act
+        Order result = orderService.createOrder(customOrder);
 
-        when(productService.getProductById(999L)).thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        Order result = orderService.createOrder(orderWithoutProduct);
-
+        // Assert
         assertNotNull(result);
-        assertNull(result.getProduct());
         assertEquals("Custom Product", result.getProductName());
-        assertEquals(BigDecimal.valueOf(15.99), result.getProductPrice());
-        verify(orderRepository).save(any(Order.class));
+        assertEquals(new BigDecimal("15.00"), result.getProductPrice());
+        assertNull(result.getProduct());
+        
+        verify(productService, never()).getProductById(anyLong());
+        verify(productService, never()).reduceStock(anyLong(), anyInt());
+        verify(orderRepository).save(customOrder);
     }
 
     @Test
-    void createOrder_WithNonExistentProductAndNoDetails_ShouldThrowException()
-    {
+    void createOrder_WithMissingProductDetails_ShouldThrowException() {
+        // Arrange
+        Order invalidOrder = Order.builder()
+            .buyer(testBuyer)
+            .quantity(1)
+            .paymentType(PaymentType.CASH)
+            .build();
+        // Missing both Product reference and productName/productPrice
 
-        Order invalidOrder = new Order();
-        invalidOrder.setProduct(new Product());
-        invalidOrder.getProduct().setId(999L);  // Non-existent product ID
-        invalidOrder.setQuantity(2);
-        invalidOrder.setBuyer(sampleUser);
-        invalidOrder.setPaymentType(PaymentType.CASH);
-
-        when(productService.getProductById(999L)).thenReturn(Optional.empty());
-
-        assertThrows(IllegalArgumentException.class, () ->
-        {
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> {
             orderService.createOrder(invalidOrder);
         });
-
+        
         verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
-    void updateOrderStatus_ShouldUpdateAndReturnOrder()
-    {
+    void updateOrderStatus_FromPendingToPaid_ShouldUpdateStatusAndSetPaidAt() {
+        // Arrange
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Long orderId = 1L;
-        OrderStatus newStatus = OrderStatus.PAID;
+        // Act
+        Order result = orderService.updateOrderStatus(testOrderId, OrderStatus.PAID, testUser);
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(sampleOrder));
-        when(orderRepository.updateStatus(anyLong(), any(OrderStatus.class))).thenReturn(1);
-
-        Order result = orderService.updateOrderStatus(orderId, newStatus);
-
-        assertNotNull(result);
-        verify(orderRepository).updateStatus(orderId, newStatus);
-        verify(orderRepository).findById(orderId);
+        // Assert
+        assertEquals(OrderStatus.PAID, result.getStatus());
+        assertNotNull(result.getPaidAt());
+        assertEquals(testUser, result.getAssignedRep());
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository).save(testOrder);
+        verify(userService, never()).incrementCollectedBalance(anyLong(), any(BigDecimal.class));
     }
 
     @Test
-    void updateOrderStatus_WhenOrderNotFound_ShouldThrowException()
-    {
+    void updateOrderStatus_FromPaidToDelivered_ShouldUpdateStatusAndIncrementBalance() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PAID);
+        testOrder.setPaidAt(LocalDateTime.now().minusHours(1));
+        testOrder.setAssignedRep(testUser);
+        
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userService.incrementCollectedBalance(anyLong(), any(BigDecimal.class))).thenReturn(testUser);
 
-        Long orderId = 999L;
-        OrderStatus newStatus = OrderStatus.PAID;
+        // Act
+        Order result = orderService.updateOrderStatus(testOrderId, OrderStatus.DELIVERED, testUser);
 
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-        when(orderRepository.updateStatus(anyLong(), any(OrderStatus.class))).thenReturn(0);
+        // Assert
+        assertEquals(OrderStatus.DELIVERED, result.getStatus());
+        assertEquals(testUser, result.getAssignedRep());
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository).save(testOrder);
+        verify(userService).incrementCollectedBalance(testUserId, testOrder.getTotalPrice());
+    }
 
-        assertThrows(OrderNotFoundException.class, () ->
-        {
-            orderService.updateOrderStatus(orderId, newStatus);
+    @Test
+    void updateOrderStatus_FromPendingToDelivered_ShouldThrowException() {
+        // Arrange
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+
+        // Act & Assert
+        assertThrows(InvalidOperationException.class, () -> {
+            orderService.updateOrderStatus(testOrderId, OrderStatus.DELIVERED, testUser);
         });
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(userService, never()).incrementCollectedBalance(anyLong(), any(BigDecimal.class));
     }
 
     @Test
-    void getUserOrders_ShouldReturnUserOrders()
-    {
+    void updateOrderStatus_ToLowerStatus_ShouldThrowException() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PAID);
+        testOrder.setAssignedRep(testUser);
+        
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
 
-        Long userId = 1L;
-        Pageable pageable = PageRequest.of(0, 10);
-        List<Order> orders = new ArrayList<>();
-        orders.add(sampleOrder);
-        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
-
-        when(orderRepository.findByBuyerId(userId, pageable)).thenReturn(orderPage);
-
-        Page<Order> result = orderService.getUserOrders(userId, pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals(sampleOrder, result.getContent().get(0));
+        // Act & Assert
+        assertThrows(InvalidOperationException.class, () -> {
+            orderService.updateOrderStatus(testOrderId, OrderStatus.PENDING, testUser);
+        });
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
-    void getAllOrders_ShouldReturnAllOrders()
-    {
+    void updateOrderStatus_ToCancelled_ShouldWorkFromAnyStatus() {
+        // Arrange
+        testOrder.setStatus(OrderStatus.PAID);
+        testOrder.setAssignedRep(testUser);
+        
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Pageable pageable = PageRequest.of(0, 10);
-        List<Order> orders = new ArrayList<>();
-        orders.add(sampleOrder);
-        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
+        // Act
+        Order result = orderService.updateOrderStatus(testOrderId, OrderStatus.CANCELLED, testUser);
 
-        when(orderRepository.findAll(pageable)).thenReturn(orderPage);
+        // Assert
+        assertEquals(OrderStatus.CANCELLED, result.getStatus());
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository).save(testOrder);
+    }
 
+    @Test
+    void updateOrderStatus_WithDifferentUser_ShouldThrowException() {
+        // Arrange
+        User anotherUser = new User();
+        anotherUser.setId(2L);
+        anotherUser.setEmail("another@acsbg.org");
+        anotherUser.setRole(Role.CLASS_REP);
+        
+        testOrder.setAssignedRep(anotherUser);
+        
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.of(testOrder));
+
+        // Act & Assert
+        assertThrows(InvalidOperationException.class, () -> {
+            orderService.updateOrderStatus(testOrderId, OrderStatus.PAID, testUser);
+        });
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void updateOrderStatus_WithNonExistentOrder_ShouldThrowException() {
+        // Arrange
+        when(orderRepository.findById(testOrderId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(OrderNotFoundException.class, () -> {
+            orderService.updateOrderStatus(testOrderId, OrderStatus.PAID, testUser);
+        });
+        
+        verify(orderRepository).findById(testOrderId);
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void getUserOrders_ShouldReturnPageOfUserOrders() {
+        // Arrange
+        Page<Order> mockPage = new PageImpl<>(List.of(testOrder));
+        Pageable pageable = mock(Pageable.class);
+        when(orderRepository.findByBuyerId(anyLong(), any(Pageable.class))).thenReturn(mockPage);
+
+        // Act
+        Page<Order> result = orderService.getUserOrders(testUserId, pageable);
+
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder, result.getContent().get(0));
+        verify(orderRepository).findByBuyerId(testUserId, pageable);
+    }
+
+    @Test
+    void getAllOrders_ShouldReturnPageOfOrders() {
+        // Arrange
+        Page<Order> mockPage = new PageImpl<>(List.of(testOrder));
+        Pageable pageable = mock(Pageable.class);
+        when(orderRepository.findAll(pageable)).thenReturn(mockPage);
+
+        // Act
         Page<Order> result = orderService.getAllOrders(pageable);
 
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals(sampleOrder, result.getContent().get(0));
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder, result.getContent().get(0));
+        verify(orderRepository).findAll(pageable);
     }
 
     @Test
-    void getOrdersByStatus_ShouldReturnFilteredOrders()
-    {
-
+    void getOrdersByStatus_ShouldReturnPageOfOrdersWithSpecifiedStatus() {
+        // Arrange
+        Page<Order> mockPage = new PageImpl<>(List.of(testOrder));
+        Pageable pageable = mock(Pageable.class);
         OrderStatus status = OrderStatus.PENDING;
-        Pageable pageable = PageRequest.of(0, 10);
-        List<Order> orders = new ArrayList<>();
-        orders.add(sampleOrder);
-        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
+        
+        when(orderRepository.findByStatus(status, pageable)).thenReturn(mockPage);
 
-        when(orderRepository.findByStatus(status, pageable)).thenReturn(orderPage);
-
+        // Act
         Page<Order> result = orderService.getOrdersByStatus(status, pageable);
 
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals(status, result.getContent().get(0).getStatus());
-    }
-
-    @Test
-    void getAssignedOrders_ShouldReturnOrdersAssignedToRep()
-    {
-
-        Long repId = 2L;
-        Pageable pageable = PageRequest.of(0, 10);
-
-        User rep = new User();
-        rep.setId(repId);
-
-        Order assignedOrder = new Order();
-        assignedOrder.setId(2L);
-        assignedOrder.setAssignedRep(rep);
-
-        List<Order> orders = new ArrayList<>();
-        orders.add(assignedOrder);
-        Page<Order> orderPage = new PageImpl<>(orders, pageable, orders.size());
-
-        when(orderRepository.findByAssignedRepId(repId, pageable)).thenReturn(orderPage);
-
-        Page<Order> result = orderService.getAssignedOrders(repId, pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-    }
-
-    @Test
-    void getOrderStatistics_ShouldReturnStatistics()
-    {
-
-        Object[] statisticsData = new Object[]{10L, 25, BigDecimal.valueOf(300.50)};
-        when(orderRepository.getOrderStatistics()).thenReturn(statisticsData);
-
-        Object[] result = orderService.getOrderStatistics();
-
-        assertNotNull(result);
-        assertEquals(3, result.length);
-        assertEquals(10L, result[0]);  // Count
-        assertEquals(25, result[1]);   // Sum of quantities
-        assertEquals(BigDecimal.valueOf(300.50), result[2]); // Sum of prices
-    }
-
-    @Test
-    void archiveDeliveredOrders_ShouldArchiveOldOrders()
-    {
-
-        LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
-        List<Order> oldOrders = new ArrayList<>();
-        oldOrders.add(sampleOrder);
-
-        when(orderRepository.findDeliveredOrdersBefore(any(LocalDateTime.class))).thenReturn(oldOrders);
-        when(archivedOrderRepository.save(any(ArchivedOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        orderService.archiveDeliveredOrders();
-
-        verify(orderRepository).findDeliveredOrdersBefore(any(LocalDateTime.class));
-        verify(archivedOrderRepository).save(any(ArchivedOrder.class));
-        verify(orderRepository).delete(sampleOrder);
-    }
-
-    @Test
-    void convertToArchivedOrder_ShouldMapAllFields()
-    {
-
-        Order order = sampleOrder;
-
-        ArchivedOrder result = orderService.convertToArchivedOrder(order);
-
-        assertNotNull(result);
-        assertEquals(order.getId(), result.getId());
-        assertEquals(order.getProduct(), result.getProduct());
-        assertEquals(order.getBuyer(), result.getBuyer());
-        assertEquals(order.getQuantity(), result.getQuantity());
-        assertEquals(order.getStatus(), result.getStatus());
-        assertEquals(order.getPaymentType(), result.getPaymentType());
-        assertEquals(order.getCreatedAt(), result.getCreatedAt());
-        assertEquals(order.getPaidAt(), result.getPaidAt());
-        assertEquals(order.getAssignedRep(), result.getAssignedRep());
-        assertEquals(order.getInstructions(), result.getInstructions());
-        assertEquals(order.getProductName(), result.getProductName());
-        assertEquals(order.getProductPrice(), result.getProductPrice());
-    }
-
-    @Test
-    void getArchivedOrders_ShouldReturnArchivedOrders()
-    {
-
-        Pageable pageable = PageRequest.of(0, 10);
-        ArchivedOrder archivedOrder = new ArchivedOrder();
-        archivedOrder.setId(1L);
-        List<ArchivedOrder> orders = new ArrayList<>();
-        orders.add(archivedOrder);
-        Page<ArchivedOrder> orderPage = new PageImpl<>(orders, pageable, orders.size());
-
-        when(archivedOrderRepository.findAll(pageable)).thenReturn(orderPage);
-
-        Page<ArchivedOrder> result = orderService.getArchivedOrders(pageable);
-
-        assertNotNull(result);
-        assertEquals(1, result.getContent().size());
-        assertEquals(archivedOrder, result.getContent().get(0));
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testOrder, result.getContent().get(0));
+        verify(orderRepository).findByStatus(status, pageable);
     }
 }

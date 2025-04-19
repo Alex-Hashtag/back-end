@@ -1,8 +1,10 @@
 package org.acs.stuco.backend.order.archive;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.acs.stuco.backend.order.OrderStatus;
 import org.acs.stuco.backend.order.PaymentType;
 import org.acs.stuco.backend.product.Product;
@@ -11,11 +13,15 @@ import org.acs.stuco.backend.user.User;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-
+/**
+ * Represents an archived order.
+ */
 @Entity
 @Table(name = "archived_orders")
-@Getter
-@Setter
+@Data // Includes @Getter, @Setter, @ToString, @EqualsAndHashCode
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ArchivedOrder
 {
 
@@ -73,6 +79,3 @@ public class ArchivedOrder
         return BigDecimal.ZERO;
     }
 }
-
-
-

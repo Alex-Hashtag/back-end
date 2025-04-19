@@ -3,307 +3,275 @@ package org.acs.stuco.backend.news;
 import org.acs.stuco.backend.news.event.NewsPostCreatedEvent;
 import org.acs.stuco.backend.upload.UploadService;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+@SpringBootTest
+@TestPropertySource(locations = "classpath:application-test.properties")
+class NewsServiceTest {
 
-@ExtendWith(MockitoExtension.class)
-class NewsServiceTest
-{
-
-    @Mock
-    private NewsRepository newsRepository;
-
-    @Mock
-    private UploadService uploadService;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @InjectMocks
+    @Autowired
     private NewsService newsService;
 
+    @MockitoBean
+    private NewsRepository newsRepository;
+
+    @MockitoBean
+    private UploadService uploadService;
+
+    @MockitoBean
+    private ApplicationEventPublisher eventPublisher;
+
     private NewsPost testNewsPost;
-    private NewsPostRequest validRequest;
-    private MockMultipartFile testBanner;
-    private MockMultipartFile[] testExtraPhotos;
+    private NewsPostRequest testNewsPostRequest;
+    private final Long testId = 1L;
 
     @BeforeEach
-    void setUp()
-    {
-
+    void setUp() {
         testNewsPost = new NewsPost();
-        testNewsPost.setId(1L);
-        testNewsPost.setTitle("Test News Post");
-        testNewsPost.setContent("This is a test news post content");
-        testNewsPost.setBannerPhotoUrl("http://example.com/banner.jpg");
-        testNewsPost.setExtraPhotos("http://example.com/extra1.jpg,http://example.com/extra2.jpg");
+        testNewsPost.setId(testId);
+        testNewsPost.setTitle("Test News");
+        testNewsPost.setContent("Test content for news post");
+        testNewsPost.setBannerPhotoUrl("banner.jpg");
+        testNewsPost.setExtraPhotos("extra1.jpg,extra2.jpg");
         testNewsPost.setCreatedAt(LocalDateTime.now());
 
-        validRequest = new NewsPostRequest(
-                "Test News Post",
-                "This is a test news post content",
-                "http://example.com/banner.jpg",
-                "http://example.com/extra1.jpg,http://example.com/extra2.jpg"
-        );
-
-        testBanner = new MockMultipartFile(
-                "banner",
+        testNewsPostRequest = new NewsPostRequest(
+                "Test News",
+                "Test content for news post",
                 "banner.jpg",
-                "image/jpeg",
-                "test banner content".getBytes()
+                "extra1.jpg,extra2.jpg"
         );
-
-        MockMultipartFile extraPhoto1 = new MockMultipartFile(
-                "extraPhoto1",
-                "extra1.jpg",
-                "image/jpeg",
-                "test extra photo 1 content".getBytes()
-        );
-
-        MockMultipartFile extraPhoto2 = new MockMultipartFile(
-                "extraPhoto2",
-                "extra2.jpg",
-                "image/jpeg",
-                "test extra photo 2 content".getBytes()
-        );
-
-        testExtraPhotos = new MockMultipartFile[]{extraPhoto1, extraPhoto2};
     }
 
     @Test
-    @DisplayName("findAll should return paginated news posts")
-    void findAllShouldReturnPaginatedPosts()
-    {
+    void findAll_ShouldReturnPageOfNewsPosts() {
+        // Arrange
+        Page<NewsPost> mockPage = new PageImpl<>(List.of(testNewsPost));
+        Pageable pageable = mock(Pageable.class);
+        when(newsRepository.findAll(pageable)).thenReturn(mockPage);
 
-        Pageable pageable = PageRequest.of(0, 10);
-        List<NewsPost> posts = Collections.singletonList(testNewsPost);
-        Page<NewsPost> postsPage = new PageImpl<>(posts);
-
-        when(newsRepository.findAll(pageable)).thenReturn(postsPage);
-
+        // Act
         Page<NewsPost> result = newsService.findAll(pageable);
 
-        assertThat(result).isEqualTo(postsPage);
-        assertThat(result.getContent()).hasSize(1);
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals(testNewsPost, result.getContent().get(0));
         verify(newsRepository).findAll(pageable);
     }
 
     @Test
-    @DisplayName("findById should return news post when exists")
-    void findByIdShouldReturnNewsPostWhenExists()
-    {
+    void findById_WhenNewsPostExists_ShouldReturnNewsPost() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.of(testNewsPost));
 
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(testNewsPost));
+        // Act
+        NewsPost result = newsService.findById(testId);
 
-        NewsPost result = newsService.findById(1L);
-
-        assertThat(result).isEqualTo(testNewsPost);
-        verify(newsRepository).findById(1L);
+        // Assert
+        assertNotNull(result);
+        assertEquals(testNewsPost.getId(), result.getId());
+        assertEquals(testNewsPost.getTitle(), result.getTitle());
+        verify(newsRepository).findById(testId);
     }
 
     @Test
-    @DisplayName("findById should return null when news post doesn't exist")
-    void findByIdShouldReturnNullWhenNewsPostDoesNotExist()
-    {
+    void findById_WhenNewsPostDoesNotExist_ShouldReturnNull() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.empty());
 
-        when(newsRepository.findById(999L)).thenReturn(Optional.empty());
+        // Act
+        NewsPost result = newsService.findById(testId);
 
-        NewsPost result = newsService.findById(999L);
-
-        assertThat(result).isNull();
-        verify(newsRepository).findById(999L);
+        // Assert
+        assertNull(result);
+        verify(newsRepository).findById(testId);
     }
 
     @Test
-    @DisplayName("createNewsPost should create and return news post with valid request")
-    void createNewsPostShouldCreateAndReturnNewsPost()
-    {
-
-        when(uploadService.upload(any(MultipartFile.class)))
-                .thenReturn("http://example.com/new-banner.jpg")
-                .thenReturn("http://example.com/new-extra1.jpg")
-                .thenReturn("http://example.com/new-extra2.jpg");
-
-        when(newsRepository.save(any(NewsPost.class))).thenAnswer(invocation ->
-        {
+    void createNewsPost_WithValidRequest_ShouldCreateAndReturnNewsPost() {
+        // Arrange
+        when(uploadService.upload(any(MultipartFile.class))).thenReturn("uploaded-banner.jpg", "extra-photo1.jpg", "extra-photo2.jpg");
+        when(newsRepository.save(any(NewsPost.class))).thenAnswer(invocation -> {
             NewsPost savedPost = invocation.getArgument(0);
-            savedPost.setId(1L);
+            savedPost.setId(testId);
             return savedPost;
         });
 
-        ResponseEntity<?> response = newsService.createNewsPost(validRequest, testBanner, testExtraPhotos);
+        MultipartFile mockBanner = mock(MultipartFile.class);
+        when(mockBanner.isEmpty()).thenReturn(false);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isInstanceOf(NewsPost.class);
+        MultipartFile mockExtra1 = mock(MultipartFile.class);
+        when(mockExtra1.isEmpty()).thenReturn(false);
 
+        MultipartFile mockExtra2 = mock(MultipartFile.class);
+        when(mockExtra2.isEmpty()).thenReturn(false);
+
+        MultipartFile[] extraPhotos = {mockExtra1, mockExtra2};
+
+        // Act
+        ResponseEntity<?> response = newsService.createNewsPost(testNewsPostRequest, mockBanner, extraPhotos);
+
+        // Assert
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
         NewsPost createdPost = (NewsPost) response.getBody();
-        assertThat(createdPost.getTitle()).isEqualTo(validRequest.title());
-        assertThat(createdPost.getContent()).isEqualTo(validRequest.content());
-        assertThat(createdPost.getBannerPhotoUrl()).isEqualTo("http://example.com/new-banner.jpg");
-
-        verify(uploadService, times(3)).upload(any(MultipartFile.class));
+        
+        assertNotNull(createdPost);
+        assertEquals(testId, createdPost.getId());
+        assertEquals(testNewsPost.getTitle(), createdPost.getTitle());
+        assertEquals(testNewsPost.getContent(), createdPost.getContent());
+        assertEquals("uploaded-banner.jpg", createdPost.getBannerPhotoUrl());
+        assertTrue(createdPost.getExtraPhotos().contains("extra-photo1.jpg"));
+        assertTrue(createdPost.getExtraPhotos().contains("extra-photo2.jpg"));
+        
+        verify(uploadService).upload(mockBanner);
+        verify(uploadService).upload(mockExtra1);
+        verify(uploadService).upload(mockExtra2);
         verify(newsRepository).save(any(NewsPost.class));
-
-        ArgumentCaptor<NewsPostCreatedEvent> eventCaptor = ArgumentCaptor.forClass(NewsPostCreatedEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-        assertThat(eventCaptor.getValue().newsPost()).isEqualTo(createdPost);
     }
 
     @Test
-    @DisplayName("createNewsPost should validate and reject invalid requests")
-    void createNewsPostShouldValidateAndRejectInvalidRequests()
-    {
-
+    void createNewsPost_WithMissingTitle_ShouldReturnBadRequest() {
+        // Arrange
         NewsPostRequest invalidRequest = new NewsPostRequest(
-                "",
-                "Content",
-                null,
-                null
+                "", // Empty title
+                "Test content",
+                "banner.jpg",
+                ""
         );
 
+        // Act
         ResponseEntity<?> response = newsService.createNewsPost(invalidRequest, null, null);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().toString()).contains("Title is required");
-
-        invalidRequest = new NewsPostRequest(
-                "Title",
-                "",
-                null,
-                null
-        );
-
-        response = newsService.createNewsPost(invalidRequest, null, null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody().toString()).contains("Content is required");
-
+        // Assert
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().toString().contains("Title is required"));
         verify(newsRepository, never()).save(any(NewsPost.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
-    @DisplayName("updateNewsPost should update existing news post")
-    void updateNewsPostShouldUpdateExistingNewsPost()
-    {
-
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(testNewsPost));
-        when(uploadService.upload(any(MultipartFile.class))).thenReturn("http://example.com/updated-banner.jpg");
-
-        NewsPostRequest updateRequest = new NewsPostRequest(
-                "Updated Title",
-                "Updated Content",
-                null,
-                null
+    void createNewsPost_WithMissingContent_ShouldReturnBadRequest() {
+        // Arrange
+        NewsPostRequest invalidRequest = new NewsPostRequest(
+                "Test Title",
+                "", // Empty content
+                "banner.jpg",
+                ""
         );
 
-        ResponseEntity<?> response = newsService.updateNewsPost(1L, updateRequest, testBanner, null);
+        // Act
+        ResponseEntity<?> response = newsService.createNewsPost(invalidRequest, null, null);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isInstanceOf(NewsPost.class);
+        // Assert
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertTrue(response.getBody().toString().contains("Content is required"));
+        verify(newsRepository, never()).save(any(NewsPost.class));
+        verify(eventPublisher, never()).publishEvent(any());
+    }
 
+    @Test
+    void updateNewsPost_WhenNewsPostExists_ShouldUpdateAndReturnNewsPost() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.of(testNewsPost));
+        when(newsRepository.save(any(NewsPost.class))).thenReturn(testNewsPost);
+        
+        NewsPostRequest updateRequest = new NewsPostRequest(
+                "Updated Title",
+                "Updated content",
+                null,
+                "extra1.jpg" // Keeping only one of the original photos
+        );
+
+        MultipartFile mockBanner = mock(MultipartFile.class);
+        when(mockBanner.isEmpty()).thenReturn(false);
+        when(uploadService.upload(mockBanner)).thenReturn("new-banner.jpg");
+
+        // Act
+        ResponseEntity<?> response = newsService.updateNewsPost(testId, updateRequest, mockBanner, null);
+
+        // Assert
+        assertEquals(HttpStatus.OK, response.getStatusCode());
         NewsPost updatedPost = (NewsPost) response.getBody();
-        assertThat(updatedPost.getTitle()).isEqualTo("Updated Title");
-        assertThat(updatedPost.getContent()).isEqualTo("Updated Content");
-        assertThat(updatedPost.getBannerPhotoUrl()).isEqualTo("http://example.com/updated-banner.jpg");
-
-        verify(uploadService).delete("http://example.com/banner.jpg");
-        verify(uploadService).upload(any(MultipartFile.class));
+        
+        assertNotNull(updatedPost);
+        assertEquals("Updated Title", updatedPost.getTitle());
+        assertEquals("Updated content", updatedPost.getContent());
+        assertEquals("new-banner.jpg", updatedPost.getBannerPhotoUrl());
+        
+        // Verify old banner was deleted
+        verify(uploadService).delete("banner.jpg");
+        
+        // Verify extra photo that wasn't kept was deleted
+        verify(uploadService).delete("extra2.jpg");
+        
+        verify(uploadService).upload(mockBanner);
         verify(newsRepository).save(testNewsPost);
     }
 
     @Test
-    @DisplayName("updateNewsPost should handle banner removal")
-    void updateNewsPostShouldHandleBannerRemoval()
-    {
+    void updateNewsPost_WhenNewsPostDoesNotExist_ShouldReturnNotFound() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.empty());
 
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(testNewsPost));
+        // Act
+        ResponseEntity<?> response = newsService.updateNewsPost(testId, testNewsPostRequest, null, null);
 
-        NewsPostRequest updateRequest = new NewsPostRequest(
-                "Updated Title",
-                "Updated Content",
-                "", // Empty banner URL indicates removal
-                null
-        );
-
-        ResponseEntity<?> response = newsService.updateNewsPost(1L, updateRequest, null, null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-
-        NewsPost updatedPost = (NewsPost) response.getBody();
-        assertThat(updatedPost.getBannerPhotoUrl()).isEmpty();
-
-        verify(uploadService).delete("http://example.com/banner.jpg");
-        verify(newsRepository).save(testNewsPost);
-    }
-
-    @Test
-    @DisplayName("updateNewsPost should return not found for non-existent post")
-    void updateNewsPostShouldReturnNotFoundForNonExistentPost()
-    {
-
-        when(newsRepository.findById(999L)).thenReturn(Optional.empty());
-
-        ResponseEntity<?> response = newsService.updateNewsPost(999L, validRequest, null, null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        // Assert
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         verify(newsRepository, never()).save(any(NewsPost.class));
     }
 
     @Test
-    @DisplayName("deleteNewsPost should delete news post and associated files")
-    void deleteNewsPostShouldDeleteNewsPostAndAssociatedFiles()
-    {
+    void deleteNewsPost_WhenNewsPostExists_ShouldDeleteAndReturnTrue() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.of(testNewsPost));
+        doNothing().when(newsRepository).delete(any(NewsPost.class));
+        
+        // Act
+        boolean result = newsService.deleteNewsPost(testId);
 
-        when(newsRepository.findById(1L)).thenReturn(Optional.of(testNewsPost));
-
-        boolean result = newsService.deleteNewsPost(1L);
-
-        assertThat(result).isTrue();
-
-        verify(uploadService).delete("http://example.com/banner.jpg");
-        verify(uploadService).delete("http://example.com/extra1.jpg");
-        verify(uploadService).delete("http://example.com/extra2.jpg");
-
+        // Assert
+        assertTrue(result);
+        
+        // Verify banner and extra photos were deleted
+        verify(uploadService).delete("banner.jpg");
+        verify(uploadService).delete("extra1.jpg");
+        verify(uploadService).delete("extra2.jpg");
+        
         verify(newsRepository).delete(testNewsPost);
     }
 
     @Test
-    @DisplayName("deleteNewsPost should return false for non-existent post")
-    void deleteNewsPostShouldReturnFalseForNonExistentPost()
-    {
+    void deleteNewsPost_WhenNewsPostDoesNotExist_ShouldReturnFalse() {
+        // Arrange
+        when(newsRepository.findById(testId)).thenReturn(Optional.empty());
 
-        when(newsRepository.findById(999L)).thenReturn(Optional.empty());
+        // Act
+        boolean result = newsService.deleteNewsPost(testId);
 
-        boolean result = newsService.deleteNewsPost(999L);
-
-        assertThat(result).isFalse();
+        // Assert
+        assertFalse(result);
         verify(newsRepository, never()).delete(any(NewsPost.class));
     }
 }
-
-

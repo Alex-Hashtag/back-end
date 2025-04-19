@@ -255,6 +255,11 @@ public class OrderService {
     @Transactional
     public void archiveDeliveredOrders() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
+        archiveDeliveredOrders(cutoffDate);
+    }
+
+    @Transactional
+    public void archiveDeliveredOrders(LocalDateTime cutoffDate) {
         List<Order> ordersToArchive = orderRepository.findDeliveredOrdersBefore(cutoffDate);
         for (Order order : ordersToArchive) {
             ArchivedOrder archivedOrder = convertToArchivedOrder(order);
@@ -297,5 +302,9 @@ public class OrderService {
     /// @return A paginated list of archived orders
     public Page<ArchivedOrder> getArchivedOrders(Pageable pageable) {
         return archivedOrderRepository.findAll(pageable);
+    }
+
+    public Optional<Order> getOrderById(Long id) {
+        return orderRepository.findById(id);
     }
 }

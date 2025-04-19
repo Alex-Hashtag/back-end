@@ -3,6 +3,9 @@ package org.acs.stuco.backend.product;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 import java.math.BigDecimal;
 
@@ -11,6 +14,9 @@ import java.math.BigDecimal;
 @Table(name = "products")
 @Getter
 @Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Product
 {
 
@@ -36,5 +42,3 @@ public class Product
 
     private Long createdBy;
 }
-
-
