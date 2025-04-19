@@ -31,14 +31,27 @@ public class UserSpecifications
         };
     }
 
+    /**
+     * Creates a specification to filter users by their graduation year.
+     * Matches emails that end with the graduation year followed by @acsbg.org
+     * Examples: a.mihaylov25@acsbg.org, m.n.georgiev27@acsbg.org, t.zornitza29@acsbg.org
+     *
+     * @param year The two-digit graduation year (e.g., 25 for 2025)
+     * @return A specification that filters users by graduation year
+     */
     public static Specification<User> hasGraduationYear(Integer year)
     {
         return (root, query, cb) ->
         {
-
+            // Format the year as a two-digit string (e.g., 25, 27, 29)
             String target = String.format("%02d", year);
-
-            return cb.like(root.get("email"), "%." + target + "@acsbg.org");
+            
+            // Match any email that has the graduation year right before @acsbg.org
+            // This handles various formats like:
+            // a.mihaylov25@acsbg.org
+            // m.n.georgiev27@acsbg.org
+            // t.zornitza29@acsbg.org
+            return cb.like(root.get("email"), "%" + target + "@acsbg.org");
         };
     }
 
