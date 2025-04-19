@@ -45,4 +45,6 @@ public interface OrderRepository extends JpaRepository<Order, Long>
     @Query("SELECT o FROM Order o WHERE o.status = 'DELIVERED' AND o.paidAt < :cutoffDate")
     List<Order> findDeliveredOrdersBefore(@Param("cutoffDate") LocalDateTime cutoffDate);
 
+    @Query("SELECT o FROM Order o WHERE o.status = 'CANCELLED' AND o.paidAt < :cutoffDate")
+    List<Order> findCancledOrdersBefore(@Param("cutoffDate") LocalDateTime cutoffDate);
 }

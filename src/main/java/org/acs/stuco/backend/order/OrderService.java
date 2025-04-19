@@ -261,6 +261,12 @@ public class OrderService {
             archivedOrderRepository.save(archivedOrder);
             orderRepository.delete(order);
         }
+        ordersToArchive = orderRepository.findCancledOrdersBefore(cutoffDate);
+        for (Order order : ordersToArchive) {
+            ArchivedOrder archivedOrder = convertToArchivedOrder(order);
+            archivedOrderRepository.save(archivedOrder);
+            orderRepository.delete(order);
+        }
     }
 
     /// Converts an Order entity to an ArchivedOrder entity.
