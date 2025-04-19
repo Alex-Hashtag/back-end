@@ -19,9 +19,26 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Service class for managing orders.
- */
+/// # Order Service
+/// 
+/// Service class that implements the core business logic for order management in the Student Council website.
+/// This service handles order creation, status updates, and archiving of old orders.
+/// 
+/// ## Key Features
+/// 
+/// - Order creation with product stock validation
+/// - Order status management with business rule enforcement
+/// - Balance tracking for representatives who collect payments
+/// - Archiving of old delivered orders
+/// 
+/// ## Order Status Flow
+/// 
+/// The order status follows this progression:
+/// 1. PENDING (initial state)
+/// 2. PAID (after payment is received)
+/// 3. DELIVERED (after order is delivered to customer)
+/// 
+/// Orders can also be CANCELLED from any status.
 @Service
 public class OrderService {
 
@@ -40,12 +57,18 @@ public class OrderService {
         this.userService = userService;
     }
 
-    /**
-     * Creates a new order.
-     *
-     * @param order The order to create
-     * @return The created order
-     */
+    /// Creates a new order with product validation and stock management.
+    /// 
+    /// This method handles:
+    /// - Validating product availability
+    /// - Reducing product stock when an order is placed
+    /// - Setting product details on the order
+    /// - Handling custom products without a product reference
+    /// 
+    /// @param order - The order to create with product and quantity information
+    /// @return The saved order with generated ID
+    /// @throws InsufficientStockException if the product doesn't have enough stock
+    /// @throws IllegalArgumentException if product information is missing
     @Transactional
     public Order createOrder(Order order) {
         Product providedProduct = order.getProduct();
@@ -84,82 +107,91 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
-    /**
-     * Updates the status of an order and handles the business logic for assigning representatives
-     * and updating balances.
-     *
-     * @param id The ID of the order to update
-     * @param newStatus The new status to set
-     * @param user The user performing the status update
-     * @return The updated order
-     * @throws OrderNotFoundException If the order is not found
-     * @throws InvalidOperationException If the operation is not allowed
-     */
+    /// Updates the status of an order with business rule enforcement.
+    /// 
+    /// This method implements the core business logic for order status updates:
+    /// 1. Checks if another user already has the order assigned
+    /// 2. Validates that the status change follows the proper progression
+    /// 3. Assigns the user to the order if not already assigned
+    /// 4. Updates timestamps based on status changes
+    /// 5. Updates the user's balance when an order is marked as delivered
+    /// 
+    /// ## Status Progression Rules
+    /// 
+    /// - Orders must follow the sequence: PENDING → PAID → DELIVERED
+    /// - Cannot skip statuses (e.g., PENDING directly to DELIVERED)
+    /// - Cannot downgrade status (e.g., DELIVERED back to PAID)
+    /// - Orders can be CANCELLED from any status
+    /// 
+    /// @param id - The ID of the order to update
+    /// @param newStatus - The new status to set
+    /// @param user - The user performing the status update
+    /// @return The updated order
+    /// @throws OrderNotFoundException if the order is not found
+    /// @throws InvalidOperationException if the operation violates business rules
     @Transactional
     public Order updateOrderStatus(Long id, OrderStatus newStatus, User user) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException(id));
-
+        
         // Check if another user has already been assigned to this order
         if (order.getAssignedRep() != null && !order.getAssignedRep().getId().equals(user.getId())) {
             throw new InvalidOperationException("This order is already assigned to another representative");
         }
-
+        
         // Check current status and validate status progression
         OrderStatus currentStatus = order.getStatus();
         validateStatusProgression(currentStatus, newStatus);
-
+        
         // Assign the user to the order if not already assigned
         if (order.getAssignedRep() == null) {
             order.setAssignedRep(user);
         }
-
+        
         // Update status
         order.setStatus(newStatus);
-
+        
         // Set paidAt timestamp if status is changing to PAID
         if (newStatus == OrderStatus.PAID && currentStatus != OrderStatus.PAID) {
             order.setPaidAt(LocalDateTime.now());
         }
-
+        
         // Calculate and update user's balance if order is being delivered
         if (newStatus == OrderStatus.DELIVERED && currentStatus != OrderStatus.DELIVERED) {
             BigDecimal orderValue = order.getTotalPrice();
             userService.incrementCollectedBalance(user.getId(), orderValue);
         }
-
+        
         return orderRepository.save(order);
     }
-
-    /**
-     * Validates that the status change follows the allowed progression:
-     * PENDING -> PAID -> DELIVERED or any status -> CANCELLED
-     *
-     * @param currentStatus The current status of the order
-     * @param newStatus The requested new status
-     * @throws InvalidOperationException If the status progression is invalid
-     */
+    
+    /// Validates that a status change follows the allowed progression rules.
+    /// 
+    /// @param currentStatus - The current status of the order
+    /// @param newStatus - The requested new status
+    /// @throws InvalidOperationException if the status progression is invalid
     private void validateStatusProgression(OrderStatus currentStatus, OrderStatus newStatus) {
         // Allow cancellation from any status
         if (newStatus == OrderStatus.CANCELLED) {
             return;
         }
-
+        
         // Prevent status downgrade (except for cancellation which is handled above)
         if (getStatusRank(newStatus) < getStatusRank(currentStatus)) {
-            throw new InvalidOperationException("Cannot downgrade order status from " +
-                    currentStatus + " to " + newStatus);
+            throw new InvalidOperationException("Cannot downgrade order status from " + 
+                                                currentStatus + " to " + newStatus);
         }
-
+        
         // Prevent skipping status (e.g., PENDING directly to DELIVERED)
         if (newStatus == OrderStatus.DELIVERED && currentStatus == OrderStatus.PENDING) {
             throw new InvalidOperationException("Cannot change status directly from PENDING to DELIVERED");
         }
     }
-
-    /**
-     * Returns a numeric rank for each status to simplify status progression checks
-     */
+    
+    /// Returns a numeric rank for each status to simplify status progression checks.
+    /// 
+    /// @param status - The order status to get the rank for
+    /// @return A numeric rank (0 for CANCELLED, 1-3 for normal progression)
     private int getStatusRank(OrderStatus status) {
         return switch (status) {
             case PENDING -> 1;
@@ -169,61 +201,57 @@ public class OrderService {
         };
     }
 
-    /**
-     * Retrieves the orders for a specific user.
-     *
-     * @param userId The ID of the user
-     * @param pageable The pagination information
-     * @return The orders for the user
-     */
+    /// Retrieves all orders for a specific user.
+    /// 
+    /// @param userId - The ID of the user
+    /// @param pageable - Pagination parameters
+    /// @return A paginated list of the user's orders
     public Page<Order> getUserOrders(Long userId, Pageable pageable) {
         return orderRepository.findByBuyerId(userId, pageable);
     }
 
-    /**
-     * Retrieves all orders.
-     *
-     * @param pageable The pagination information
-     * @return All orders
-     */
+    /// Retrieves all orders in the system.
+    /// 
+    /// @param pageable - Pagination parameters
+    /// @return A paginated list of all orders
     public Page<Order> getAllOrders(Pageable pageable) {
         return orderRepository.findAll(pageable);
     }
 
-    /**
-     * Retrieves the orders with a specific status.
-     *
-     * @param status The status to filter by
-     * @param pageable The pagination information
-     * @return The orders with the specified status
-     */
+    /// Retrieves orders with a specific status.
+    /// 
+    /// @param status - The status to filter by
+    /// @param pageable - Pagination parameters
+    /// @return A paginated list of orders with the specified status
     public Page<Order> getOrdersByStatus(OrderStatus status, Pageable pageable) {
         return orderRepository.findByStatus(status, pageable);
     }
 
-    /**
-     * Retrieves the orders assigned to a specific representative.
-     *
-     * @param repId The ID of the representative
-     * @param pageable The pagination information
-     * @return The orders assigned to the representative
-     */
+    /// Retrieves orders assigned to a specific representative.
+    /// 
+    /// @param repId - The ID of the representative
+    /// @param pageable - Pagination parameters
+    /// @return A paginated list of orders assigned to the representative
     public Page<Order> getAssignedOrders(Long repId, Pageable pageable) {
         return orderRepository.findByAssignedRepId(repId, pageable);
     }
 
-    /**
-     * Retrieves the order statistics.
-     *
-     * @return The order statistics
-     */
+    /// Retrieves order statistics.
+    /// 
+    /// Returns an array containing:
+    /// - [0]: Total count of delivered orders
+    /// - [1]: Sum of quantities of all delivered orders
+    /// - [2]: Total revenue from all delivered orders
+    /// 
+    /// @return Order statistics as an array of objects
     public Object[] getOrderStatistics() {
         return orderRepository.getOrderStatistics();
     }
 
-    /**
-     * Archives delivered orders older than 30 days.
-     */
+    /// Archives delivered orders that are older than 30 days.
+    /// 
+    /// This method moves old delivered orders to an archive table to
+    /// keep the main orders table efficient.
     @Transactional
     public void archiveDeliveredOrders() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
@@ -235,12 +263,10 @@ public class OrderService {
         }
     }
 
-    /**
-     * Converts an order to an archived order.
-     *
-     * @param order The order to convert
-     * @return The archived order
-     */
+    /// Converts an Order entity to an ArchivedOrder entity.
+    /// 
+    /// @param order - The order to convert
+    /// @return The archived order with all data copied from the original
     public ArchivedOrder convertToArchivedOrder(Order order) {
         ArchivedOrder archivedOrder = new ArchivedOrder();
         archivedOrder.setId(order.getId());
@@ -259,12 +285,10 @@ public class OrderService {
         return archivedOrder;
     }
 
-    /**
-     * Retrieves the archived orders.
-     *
-     * @param pageable The pagination information
-     * @return The archived orders
-     */
+    /// Retrieves archived orders.
+    /// 
+    /// @param pageable - Pagination parameters
+    /// @return A paginated list of archived orders
     public Page<ArchivedOrder> getArchivedOrders(Pageable pageable) {
         return archivedOrderRepository.findAll(pageable);
     }
