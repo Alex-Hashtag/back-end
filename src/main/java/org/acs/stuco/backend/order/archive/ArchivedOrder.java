@@ -13,6 +13,7 @@ import org.acs.stuco.backend.user.User;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+
 /**
  * Represents an archived order.
  */

@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.util.List;
 
+
 /**
  * Service class for managing users.
  */
@@ -96,7 +97,7 @@ public class UserService
     /**
      * Updates a user's role.
      *
-     * @param userId The ID of the user to update
+     * @param userId  The ID of the user to update
      * @param newRole The new role to assign
      * @return The updated user
      * @throws AccessDeniedException if the current user doesn't have permission to update the role
@@ -175,11 +176,12 @@ public class UserService
     {
         User user = getUserById(userId);
         BigDecimal currentBalance = user.getCollectedBalance();
-        
-        if (currentBalance == null) {
+
+        if (currentBalance == null)
+        {
             currentBalance = BigDecimal.ZERO;
         }
-        
+
         user.setCollectedBalance(currentBalance.add(amount));
         return userRepository.save(user);
     }
@@ -238,14 +240,14 @@ public class UserService
     /**
      * Filters users based on various criteria.
      *
-     * @param roles The roles to filter by
-     * @param searchTerm The search term to filter by
+     * @param roles          The roles to filter by
+     * @param searchTerm     The search term to filter by
      * @param graduationYear The graduation year to filter by
-     * @param balanceEq The exact balance to filter by
-     * @param balanceGt The minimum balance to filter by
-     * @param balanceLt The maximum balance to filter by
-     * @param activeOrders Whether to filter by active orders
-     * @param pageable Pagination parameters
+     * @param balanceEq      The exact balance to filter by
+     * @param balanceGt      The minimum balance to filter by
+     * @param balanceLt      The maximum balance to filter by
+     * @param activeOrders   Whether to filter by active orders
+     * @param pageable       Pagination parameters
      * @return A page of filtered users
      */
     public Page<User> filterUsers(List<Role> roles,

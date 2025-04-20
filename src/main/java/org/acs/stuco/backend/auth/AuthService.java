@@ -55,7 +55,7 @@ public class AuthService
         this.eventPublisher = eventPublisher;
     }
 
-    
+
     public ResponseEntity<?> register(
             String email,
             String fullName,
@@ -111,7 +111,7 @@ public class AuthService
                 .body("Registration successful! Please check your email to verify.");
     }
 
-    
+
     @Async
     public CompletableFuture<Void> sendVerificationEmailAsync(String email, String token)
     {
@@ -135,7 +135,7 @@ public class AuthService
         }
     }
 
-    
+
     public ResponseEntity<?> login(LoginRequest request)
     {
         User user = userRepository.findByEmail(request.email())
@@ -156,7 +156,7 @@ public class AuthService
         return ResponseEntity.ok(Map.of("token", token));
     }
 
-    
+
     public ResponseEntity<String> verifyEmail(String token)
     {
         User user = userRepository.findByVerificationToken(token)
@@ -171,7 +171,7 @@ public class AuthService
         return ResponseEntity.ok("Email verified successfully!");
     }
 
-    
+
     public ResponseEntity<?> forgotPassword(String email)
     {
         User user = userRepository.findByEmail(email)
@@ -189,25 +189,28 @@ public class AuthService
         user.setResetPasswordTokenExpiry(LocalDateTime.now().plusHours(24));
         userRepository.save(user);
 
-        try {
+        try
+        {
             sendPasswordResetEmailAsync(email, token)
-                .exceptionally(ex -> {
-                    logger.error("Failed to send password reset email to {}", email, ex);
-                    return null;
-                });
-                
+                    .exceptionally(ex ->
+                    {
+                        logger.error("Failed to send password reset email to {}", email, ex);
+                        return null;
+                    });
+
             // Print the reset token to the console as a fallback when email service is down
-            logger.info("PASSWORD RESET TOKEN for {}: {} (valid until {})", 
-                email, token, user.getResetPasswordTokenExpiry());
-                
+            logger.info("PASSWORD RESET TOKEN for {}: {} (valid until {})",
+                    email, token, user.getResetPasswordTokenExpiry());
+
             return ResponseEntity.ok("Password reset instructions have been sent to your email.");
-        } catch (Exception e) {
+        } catch (Exception e)
+        {
             logger.error("Critical error in password reset flow", e);
             return ResponseEntity.ok("Password reset instructions have been sent to your email if it exists in our system.");
         }
     }
 
-    
+
     @Async
     public CompletableFuture<Void> sendPasswordResetEmailAsync(String email, String token)
     {
@@ -231,7 +234,7 @@ public class AuthService
         }
     }
 
-    
+
     public ResponseEntity<?> resetPassword(String token, String newPassword)
     {
         if (!isPasswordValid(newPassword))
@@ -260,7 +263,7 @@ public class AuthService
         return ResponseEntity.ok("Your password has been successfully reset.");
     }
 
-    
+
     private boolean isPasswordValid(String password)
     {
         if (password.length() < 8) return false;

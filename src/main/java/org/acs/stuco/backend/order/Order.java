@@ -1,11 +1,7 @@
 package org.acs.stuco.backend.order;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import lombok.*;
 import org.acs.stuco.backend.product.Product;
 import org.acs.stuco.backend.user.User;
 import org.hibernate.annotations.OnDelete;
@@ -13,6 +9,7 @@ import org.hibernate.annotations.OnDeleteAction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
 
 /**
  * Represents an order in the system.

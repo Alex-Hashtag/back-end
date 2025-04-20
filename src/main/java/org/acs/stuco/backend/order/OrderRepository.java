@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
+
 /**
  * Repository for orders
  */
@@ -36,7 +37,7 @@ public interface OrderRepository extends JpaRepository<Order, Long>
      * - Count of delivered orders
      * - Sum of quantities of all delivered orders
      * - Sum of total prices of all delivered orders (quantity * unit price)
-     * 
+     *
      * @return Object array with [count, quantity sum, price sum]
      */
     @Query("SELECT COUNT(o), SUM(o.quantity), SUM(o.quantity * o.productPrice) FROM Order o WHERE o.status = 'DELIVERED'")

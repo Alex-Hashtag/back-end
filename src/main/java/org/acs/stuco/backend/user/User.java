@@ -2,15 +2,12 @@ package org.acs.stuco.backend.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
 
 /**
  * Represents a user in the database.
@@ -48,10 +45,10 @@ public class User
 
     @Column(unique = true)
     private String verificationToken;
-    
+
     @Column(unique = true)
     private String resetPasswordToken;
-    
+
     private LocalDateTime resetPasswordTokenExpiry;
 
     private Integer graduationYear;

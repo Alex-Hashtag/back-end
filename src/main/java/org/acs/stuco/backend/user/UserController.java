@@ -4,22 +4,24 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
 
+
 /**
  * Controller for handling user-related operations.
  */
 @RestController
 @RequestMapping("/api/users")
-public class UserController {
+public class UserController
+{
     private final UserService userService;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService)
+    {
         this.userService = userService;
     }
 
@@ -31,7 +33,8 @@ public class UserController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('REP', 'STUCO', 'ADMIN')")
-    public ResponseEntity<Page<User>> getAllUsers(Pageable pageable) {
+    public ResponseEntity<Page<User>> getAllUsers(Pageable pageable)
+    {
         return ResponseEntity.ok(userService.getAllUsers(pageable));
     }
 
@@ -43,7 +46,8 @@ public class UserController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('REP', 'STUCO', 'ADMIN')")
-    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+    public ResponseEntity<User> getUserById(@PathVariable Long id)
+    {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
@@ -53,7 +57,8 @@ public class UserController {
      * @return The currently authenticated user
      */
     @GetMapping("/me")
-    public ResponseEntity<User> getCurrentUser() {
+    public ResponseEntity<User> getCurrentUser()
+    {
         return ResponseEntity.ok(userService.getCurrentUser());
     }
 
@@ -64,14 +69,15 @@ public class UserController {
      * @return The updated user
      */
     @PutMapping("/me")
-    public ResponseEntity<User> updateCurrentUser(@RequestBody User userDetails) {
+    public ResponseEntity<User> updateCurrentUser(@RequestBody User userDetails)
+    {
         return ResponseEntity.ok(userService.updateCurrentUser(userDetails));
     }
 
     /**
      * Updates a user's role (requires STUCO or ADMIN role).
      *
-     * @param id The ID of the user to update
+     * @param id      The ID of the user to update
      * @param newRole The new role to assign
      * @return The updated user
      */
@@ -79,7 +85,8 @@ public class UserController {
     @PreAuthorize("hasAnyRole('STUCO','ADMIN')")
     public ResponseEntity<User> updateUserRole(
             @PathVariable Long id,
-            @RequestParam Role newRole) {
+            @RequestParam Role newRole)
+    {
         return ResponseEntity.ok(userService.updateUserRole(id, newRole));
     }
 
@@ -90,7 +97,8 @@ public class UserController {
      */
     @GetMapping("/roles")
     @PreAuthorize("hasAnyRole('STUCO', 'ADMIN')")
-    public ResponseEntity<Role[]> getAllRoles() {
+    public ResponseEntity<Role[]> getAllRoles()
+    {
         return ResponseEntity.ok(Role.values());
     }
 
@@ -102,7 +110,8 @@ public class UserController {
      */
     @GetMapping("/class-reps")
     @PreAuthorize("hasAnyRole('STUCO', 'ADMIN')")
-    public ResponseEntity<Page<User>> getClassRepsWithBalances(Pageable pageable) {
+    public ResponseEntity<Page<User>> getClassRepsWithBalances(Pageable pageable)
+    {
         return ResponseEntity.ok(userService.getClassRepsWithBalances(pageable));
     }
 
@@ -114,7 +123,8 @@ public class UserController {
      */
     @PostMapping("/{id}/balance/clear")
     @PreAuthorize("hasAnyRole('STUCO', 'ADMIN')")
-    public ResponseEntity<Void> clearRepBalance(@PathVariable Long id) {
+    public ResponseEntity<Void> clearRepBalance(@PathVariable Long id)
+    {
         userService.clearUserBalance(id);
         return ResponseEntity.noContent().build();
     }
@@ -127,7 +137,8 @@ public class UserController {
      */
     @PostMapping("/upload-pfp")
     public ResponseEntity<User> uploadProfilePicture(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file)
+    {
         return ResponseEntity.ok(userService.uploadProfilePicture(file));
     }
 
@@ -139,7 +150,8 @@ public class UserController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('STUCO', 'ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id)
+    {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
@@ -147,14 +159,14 @@ public class UserController {
     /**
      * Filters users based on various criteria (requires REP, STUCO, or ADMIN role).
      *
-     * @param roles The roles to filter by
-     * @param searchTerm The search term to filter by
+     * @param roles          The roles to filter by
+     * @param searchTerm     The search term to filter by
      * @param graduationYear The graduation year to filter by
-     * @param balanceEq The exact balance to filter by
-     * @param balanceGt The minimum balance to filter by
-     * @param balanceLt The maximum balance to filter by
-     * @param activeOrders Whether to filter by active orders
-     * @param pageable Pagination parameters
+     * @param balanceEq      The exact balance to filter by
+     * @param balanceGt      The minimum balance to filter by
+     * @param balanceLt      The maximum balance to filter by
+     * @param activeOrders   Whether to filter by active orders
+     * @param pageable       Pagination parameters
      * @return A page of filtered users
      */
     @GetMapping("/search")
@@ -167,7 +179,8 @@ public class UserController {
             @RequestParam(required = false) BigDecimal balanceGt,
             @RequestParam(required = false) BigDecimal balanceLt,
             @RequestParam(required = false) Boolean activeOrders,
-            Pageable pageable) {
+            Pageable pageable)
+    {
         Page<User> result = userService.filterUsers(roles, searchTerm, graduationYear,
                 balanceEq, balanceGt, balanceLt, activeOrders, pageable);
         return ResponseEntity.ok(result);
