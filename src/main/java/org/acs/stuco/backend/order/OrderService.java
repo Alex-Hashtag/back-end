@@ -176,13 +176,6 @@ public class OrderService
             user.setCollectedBalance(user.getCollectedBalance().add(order.getTotalPrice()));
         }
 
-        // Calculate and update user's balance if order is being delivered
-        if (newStatus == OrderStatus.DELIVERED && currentStatus != OrderStatus.DELIVERED)
-        {
-            BigDecimal orderValue = order.getTotalPrice();
-            userService.incrementCollectedBalance(user.getId(), orderValue);
-        }
-
         return orderRepository.save(order);
     }
 
