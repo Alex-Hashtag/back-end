@@ -173,6 +173,7 @@ public class OrderService
         if (newStatus == OrderStatus.PAID && currentStatus != OrderStatus.PAID)
         {
             order.setPaidAt(LocalDateTime.now());
+            user.setCollectedBalance(user.getCollectedBalance().add(order.getTotalPrice()));
         }
 
         // Calculate and update user's balance if order is being delivered
